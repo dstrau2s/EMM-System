@@ -1,0 +1,26 @@
+# Eclipse
+.classpath
+.project
+.settings/
+.metadata/
+bin/
+
+# Maven
+target/
+.mvn/
+mvnw
+mvnw.cmd
+
+# VS Code  
+.vscode/
+
+# IDE
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
