@@ -30,7 +30,7 @@ Reporting und Audit-Logging.
 
 ## 🖥️ Konsolen-Oberfläche - Hauptmenu:
 
-=== EMM DATENBANK-MANAGER ===
+	=== EMM DATENBANK-MANAGER ===
 
     1. sp_NeuesGerätErfassen - Neues Gerät erfassen
 	2. sp_GerätEntfernen_Einfach - Gerät entfernen (Soft-Delete)
