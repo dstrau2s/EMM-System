@@ -53,132 +53,132 @@ Reporting und Audit-Logging.
 
 ## Beispiel 1: Neues Gerät erfassen
 
-SP_NEUESGERÄTERFASSEN - Neues Gerät erfassen
-=============================================
-Hersteller (z.B. Apple, Samsung, Dell): Apple
-Modell (z.B. iPhone 15, Galaxy S24, XPS 13): iPhone 15 Pro
-Betriebssystem (Windows, iOS, Android, macOS): iOS
-OS Version (z.B. 17.2, 14, 23H2): 17.2
-IMEI/Seriennummer: 123456789012345
-Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN) [LAGER]: LAGER
+	SP_NEUESGERÄTERFASSEN - Neues Gerät erfassen
+	=============================================
+	Hersteller (z.B. Apple, Samsung, Dell): Apple
+	Modell (z.B. iPhone 15, Galaxy S24, XPS 13): iPhone 15 Pro
+	Betriebssystem (Windows, iOS, Android, macOS): iOS
+	OS Version (z.B. 17.2, 14, 23H2): 17.2
+	IMEI/Seriennummer: 123456789012345
+	Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN) [LAGER]: LAGER
 
-Erfasse neues Gerät...
+	Erfasse neues Gerät...
 
-✓ Erfolg! Neues Gerät erfasst mit ID: 42
-Hersteller: Apple
-Modell: iPhone 15 Pro
-Status: LAGER
-text
+	✓ Erfolg! Neues Gerät erfasst mit ID: 42
+	Hersteller: Apple
+	Modell: iPhone 15 Pro
+	Status: LAGER
+
 
 
 ## Beispiel 2: Gerät an Mitarbeiter ausgeben
 
-SP_GERÄTAUSGEBEN - Gerät an Mitarbeiter ausgeben
-=================================================
-Geräte-ID: 42
-Mitarbeiter-ID: 101
-Ausgegeben von (z.B. IT-Admin, IT-Support): IT-Admin
+	SP_GERÄTAUSGEBEN - Gerät an Mitarbeiter ausgeben
+	=================================================
+	Geräte-ID: 42
+	Mitarbeiter-ID: 101
+	Ausgegeben von (z.B. IT-Admin, IT-Support): IT-Admin
 
-✓ Erfolg: Gerät erfolgreich an Mitarbeiter ausgegeben
-text
+	✓ Erfolg: Gerät erfolgreich an Mitarbeiter ausgegeben
+	text
 
 
 ## Beispiel 3: Compliance-Check durchführen
 
-SP_DEMOCOMPLIANCECHECK - Compliance-Check für Richtlinie
-=========================================================
+	SP_DEMOCOMPLIANCECHECK - Compliance-Check für Richtlinie
+	=========================================================
 
-Verfügbare Richtlinien:
-ID   Name                     Beschreibung
---------------------------------------------------
-1    OS-Version-Richtlinie    Mindestanforderung iOS 17.0 / Android 13
-2    Antivirus-Policy         Antivirus muss installiert und aktiv sein
-3    Encryption-Policy        Vollständige Geräteverschlüsselung erforderlich
-4    Passwort-Policy          Mindestpasswortlänge 8 Zeichen, Komplexität
-5    App-Whitelist           Nur genehmigte Business-Apps erlaubt
-6    MDM-Enrollment          Gerät muss im MDM registriert sein
+	Verfügbare Richtlinien:
+	ID   Name                     Beschreibung
+	--------------------------------------------------
+	1    OS-Version-Richtlinie    Mindestanforderung iOS 17.0 / Android 13
+	2    Antivirus-Policy         Antivirus muss installiert und aktiv sein
+	3    Encryption-Policy        Vollständige Geräteverschlüsselung erforderlich
+	4    Passwort-Policy          Mindestpasswortlänge 8 Zeichen, Komplexität
+	5    App-Whitelist           Nur genehmigte Business-Apps erlaubt
+	6    MDM-Enrollment          Gerät muss im MDM registriert sein
 
-Richtlinien-ID für Compliance-Check: 1
+	Richtlinien-ID für Compliance-Check: 1
 
-Führe Compliance-Check durch...
+	Führe Compliance-Check durch...
 
-COMPLIANCE-CHECK ERGEBNIS
-==========================================
-Geprüfte Richtlinie: OS-Version-Richtlinie
-Anzahl Geräte: 187
-Erfüllt: 172
-Nicht erfüllt: 15
-Erfüllungsquote: 92.0%
-Prüfungszeitpunkt: 2024-02-15 10:45:22.350
+	COMPLIANCE-CHECK ERGEBNIS
+	==========================================
+	Geprüfte Richtlinie: OS-Version-Richtlinie
+	Anzahl Geräte: 187
+	Erfüllt: 172
+	Nicht erfüllt: 15
+	Erfüllungsquote: 92.0%
+	Prüfungszeitpunkt: 2024-02-15 10:45:22.350
 
-Details der Compliance-Prüfungen:
-GerätID  Gerät                 Erfüllt    Geprüft am   Bemerkung
----------------------------------------------------------------
-127      iPhone 15 Pro         ✓          2024-02-15   iOS 17.3.1 - konform
-118      Samsung Galaxy S23    ✓          2024-02-15   Android 14 - konform
-95       Google Pixel 7        ✓          2024-02-15   Android 14 - konform
-83       iPhone 14             ✓          2024-02-15   iOS 17.2.1 - konform
-76       Samsung Galaxy S22    ✗          2024-02-15   Android 12 - Update erforderlich
-64       iPhone 13             ✓          2024-02-15   iOS 17.0   - minimal konform
-52       OnePlus 9             ✗          2024-02-15   Android 11 - Sicherheitsupdate dringend
-41       iPhone 12             ✓          2024-02-15   iOS 17.1.2 - konform
-33       Samsung Galaxy A54    ✓          2024-02-15   Android 14 - konform
-22       Google Pixel 6a       ✓          2024-02-15   Android 14 - konform
-19       iPhone 11             ✗          2024-02-15   iOS 15.7   - Update nicht verfügbar
-14       Samsung Galaxy S21    ✗          2024-02-15   Android 13 - Update blockiert
-9        iPhone SE (2020)      ✓          2024-02-15   iOS 17.2   - konform
-5        Motorola Edge 30      ✓          2024-02-15   Android 13 - konform
-2        iPhone XR             ✗          2024-02-15   iOS 16.7   - Hardware-Limit
+	Details der Compliance-Prüfungen:
+	GerätID  Gerät                 Erfüllt    Geprüft am   Bemerkung
+	---------------------------------------------------------------
+	127      iPhone 15 Pro         ✓          2024-02-15   iOS 17.3.1 - konform
+	118      Samsung Galaxy S23    ✓          2024-02-15   Android 14 - konform
+	95       Google Pixel 7        ✓          2024-02-15   Android 14 - konform
+	83       iPhone 14             ✓          2024-02-15   iOS 17.2.1 - konform
+	76       Samsung Galaxy S22    ✗          2024-02-15   Android 12 - Update erforderlich
+	64       iPhone 13             ✓          2024-02-15   iOS 17.0   - minimal konform
+	52       OnePlus 9             ✗          2024-02-15   Android 11 - Sicherheitsupdate dringend
+	41       iPhone 12             ✓          2024-02-15   iOS 17.1.2 - konform
+	33       Samsung Galaxy A54    ✓          2024-02-15   Android 14 - konform
+	22       Google Pixel 6a       ✓          2024-02-15   Android 14 - konform
+	19       iPhone 11             ✗          2024-02-15   iOS 15.7   - Update nicht verfügbar
+	14       Samsung Galaxy S21    ✗          2024-02-15   Android 13 - Update blockiert
+	9        iPhone SE (2020)      ✓          2024-02-15   iOS 17.2   - konform
+	5        Motorola Edge 30      ✓          2024-02-15   Android 13 - konform
+	2        iPhone XR             ✗          2024-02-15   iOS 16.7   - Hardware-Limit
 
-Angezeigt: 15 von 187 Prüfungen
+	Angezeigt: 15 von 187 Prüfungen
 
 ## Beispiel 4: Audit-Log anzeigen
 
-AUDITLOG - ÄNDERUNGSPROTOKOLL
-==========================================
+	AUDITLOG - ÄNDERUNGSPROTOKOLL
+	==========================================
 
-ID Tabelle Aktion Alt Neu Zeitpunkt Benutzer
+	ID Tabelle Aktion Alt Neu Zeitpunkt Benutzer
 
-42 Endgeraet Statusänderung LAGER AKTIV 2024-12-09 14:30:15 IT-Admin
-41 Endgeraet Statusänderung AKTIV LAGER 2024-12-09 14:25:10 System
-40 Endgeraet Statusänderung LAGER AKTIV 2024-12-09 14:20:05 IT-Admin
+	42 Endgeraet Statusänderung LAGER AKTIV 2024-12-09 14:30:15 IT-Admin
+	41 Endgeraet Statusänderung AKTIV LAGER 2024-12-09 14:25:10 System
+	40 Endgeraet Statusänderung LAGER AKTIV 2024-12-09 14:20:05 IT-Admin
 
-AUDITLOG STATISTIK
+	AUDITLOG STATISTIK
 
-Gesamteinträge: 42
-Überwachte Tabellen: 3
-Erster Eintrag: 2024-11-01 09:00:00.000
-Letzter Eintrag: 2024-12-09 14:30:15.123
-Überwachte Benutzer: 2
-Statusänderungen (Endgeräte): 28
+	Gesamteinträge: 42
+	Überwachte Tabellen: 3
+	Erster Eintrag: 2024-11-01 09:00:00.000
+	Letzter Eintrag: 2024-12-09 14:30:15.123
+	Überwachte Benutzer: 2
+	Statusänderungen (Endgeräte): 28
 
-Top 5 Aktionen:
-Statusänderung: 28
-INSERT: 8
-UPDATE: 6
+	Top 5 Aktionen:
+	Statusänderung: 28
+	INSERT: 8
+	UPDATE: 6
 
-SP_MONATSREPORT - Monatlicher Kostenreport
-===========================================
-Monat (1-12, leer für aktuellen Monat): 02
-Jahr (z.B. 2024, leer für aktuelles Jahr): 2024
+	SP_MONATSREPORT - Monatlicher Kostenreport
+	===========================================
+	Monat (1-12, leer für aktuellen Monat): 02
+	Jahr (z.B. 2024, leer für aktuelles Jahr): 2024
 
-Generiere Report für 2/2024...
+	Generiere Report für 2/2024...
 
-MONATSREPORT 02/2024
-================================================================================
+	MONATSREPORT 02/2024
+	================================================================================
 
-Abteilung           Geräte        Kosten (€)    Durchschn. Datenvol.    Budget (€)    Budget-Rest (€)
----------------------------------------------------------------------------------------
-IT                  38            8,120.00      4.5 GB                 9,500.00      1,380.00
-Vertrieb            25            5,875.30      7.2 GB                 6,500.00      624.70
-Entwicklung         22            4,840.00      8.1 GB                 5,000.00      160.00
-Marketing           18            3,780.45      5.3 GB                 4,200.00      419.55
-HR                  12            2,520.00      2.8 GB                 3,000.00      480.00
-Support             8             1,680.00      3.6 GB                 2,000.00      320.00
+	Abteilung           Geräte        Kosten (€)    Durchschn. Datenvol.    Budget (€)    Budget-Rest (€)
+	---------------------------------------------------------------------------------------
+	IT                  38            8,120.00      4.5 GB                 9,500.00      1,380.00
+	Vertrieb            25            5,875.30      7.2 GB                 6,500.00      624.70
+	Entwicklung         22            4,840.00      8.1 GB                 5,000.00      160.00
+	Marketing           18            3,780.45      5.3 GB                 4,200.00      419.55
+	HR                  12            2,520.00      2.8 GB                 3,000.00      480.00
+	Support             8             1,680.00      3.6 GB                 2,000.00      320.00
 
-================================================================================
-SUMME:              6             26,815.75                             30,200.00     3,384.25
-================================================================================
+	================================================================================
+	SUMME:              6             26,815.75                             30,200.00     3,384.25
+	================================================================================
 
 
 ## Features
