@@ -51,7 +51,7 @@ Reporting und Audit-Logging.
 
 ## 📊 Beispiel-Interaktionen
 
-### Beispiel 1: Neues Gerät erfassen
+## Beispiel 1: Neues Gerät erfassen
 
 SP_NEUESGERÄTERFASSEN - Neues Gerät erfassen
 =============================================
@@ -71,7 +71,7 @@ Status: LAGER
 text
 
 
-### Beispiel 2: Gerät an Mitarbeiter ausgeben
+## Beispiel 2: Gerät an Mitarbeiter ausgeben
 
 SP_GERÄTAUSGEBEN - Gerät an Mitarbeiter ausgeben
 =================================================
@@ -83,7 +83,7 @@ Ausgegeben von (z.B. IT-Admin, IT-Support): IT-Admin
 text
 
 
-### Beispiel 3: Compliance-Check durchführen
+## Beispiel 3: Compliance-Check durchführen
 
 SP_DEMOCOMPLIANCECHECK - Compliance-Check für Richtlinie
 =========================================================
@@ -132,7 +132,7 @@ GerätID  Gerät                 Erfüllt    Geprüft am   Bemerkung
 
 Angezeigt: 15 von 187 Prüfungen
 
-### Beispiel 4: Audit-Log anzeigen
+## Beispiel 4: Audit-Log anzeigen
 
 AUDITLOG - ÄNDERUNGSPROTOKOLL
 ==========================================
