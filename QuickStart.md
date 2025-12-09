@@ -18,10 +18,10 @@ cd emm-java-client
 mvn clean compile
 mvn exec:java -Dexec.mainClass="de.emm.demo.EMMDatabaseManager"
 
-EMM-System/
-├── database/           # Complete SQL database schema
-├── emm-java-client/    # Java console application
-└── README.md           # This file
+	EMM-System/
+	├── database/           # Complete SQL database schema
+	├── emm-java-client/    # Java console application
+	└── README.md           # This file
 
 🛠️ Technologies
 
