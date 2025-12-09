@@ -70,7 +70,6 @@ Reporting und Audit-Logging.
 	Status: LAGER
 
 
-
 ## Beispiel 2: Gerät an Mitarbeiter ausgeben
 
 	SP_GERÄTAUSGEBEN - Gerät an Mitarbeiter ausgeben
@@ -80,7 +79,6 @@ Reporting und Audit-Logging.
 	Ausgegeben von (z.B. IT-Admin, IT-Support): IT-Admin
 
 	✓ Erfolg: Gerät erfolgreich an Mitarbeiter ausgegeben
-	text
 
 
 ## Beispiel 3: Compliance-Check durchführen
@@ -132,6 +130,7 @@ Reporting und Audit-Logging.
 
 	Angezeigt: 15 von 187 Prüfungen
 
+
 ## Beispiel 4: Audit-Log anzeigen
 
 	AUDITLOG - ÄNDERUNGSPROTOKOLL
@@ -182,7 +181,6 @@ Reporting und Audit-Logging.
 
 
 ## Features
-
     - JDBC-Verbindung - Sichere Verbindung zu SQL Server
     - Parametrisierte Queries - Schutz vor SQL-Injection
     - Transaktionssicher - Fehlerbehandlung mit Rollback
@@ -236,7 +234,6 @@ Reporting und Audit-Logging.
     Datenbank-Benutzer mit entsprechenden Rechten
 
 ## Konfigurationsdatei
-
 Die Verbindungsparameter sind hartcodiert in der Hauptklasse:
 
 	// In EMMDatabaseManager.java
@@ -246,7 +243,6 @@ Die Verbindungsparameter sind hartcodiert in der Hauptklasse:
 	private static final String PASSWORD = "emm_x123";
 
 ## Fehlerbehandlung
-
 Das System bietet umfassende Fehlerbehandlung:
 
 Verbindungsfehler
