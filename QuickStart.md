@@ -14,9 +14,9 @@ Run the SQL scripts in `database/` folder in order:
 
 ### 2. Java Client
 
-cd emm-java-client
-mvn clean compile
-mvn exec:java -Dexec.mainClass="de.emm.demo.EMMDatabaseManager"
+	cd emm-java-client
+	mvn clean compile
+	mvn exec:java -Dexec.mainClass="de.emm.demo.EMMDatabaseManager"
 
 	EMM-System/
 	├── database/           # Complete SQL database schema
