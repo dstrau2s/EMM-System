@@ -2,7 +2,8 @@ package de.emm.demo;
 
 import java.sql.*;
 import java.time.LocalDate;
-// import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 public class EMMDatabaseManager {
@@ -747,7 +748,7 @@ public class EMMDatabaseManager {
         
         switch (choice) {
             case "1":
-                showView(conn, "V_AktiveGeräte", 10);
+                showView(conn, "V_AktiveGeräte", 25);
                 break;
             case "2":
                 showView(conn, "V_KostenProAbteilung", 0);
@@ -812,128 +813,45 @@ public class EMMDatabaseManager {
         }
     }
     
-    // ============================================================
-    // 11. Tabellen anzeigen
-    // ============================================================
-    private static void showAllTables(Connection conn) throws SQLException {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("ALLE TABELLEN IN DER DATENBANK");
-        System.out.println("=".repeat(60));
-        
-        // KORRIGIERT: Ohne CREATE_DATE Spalte
-        String sql = "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE " +
-                    "FROM INFORMATION_SCHEMA.TABLES " +
-                    "WHERE TABLE_SCHEMA = 'dbo' " +
-                    "ORDER BY TABLE_TYPE, TABLE_NAME";
-        
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
-            System.out.printf("\n%-30s %-15s%n", "Tabelle", "Typ");
-            System.out.println("-".repeat(50));
-            
-            int tableCount = 0;
-            int viewCount = 0;
-            
-            while (rs.next()) {
-                String type = rs.getString("TABLE_TYPE");
-                System.out.printf("%-30s %-15s%n",
-                    rs.getString("TABLE_NAME"),
-                    type);
-                
-                if ("VIEW".equals(type)) {
-                    viewCount++;
-                } else if ("BASE TABLE".equals(type)) {
-                    tableCount++;
-                }
-            }
-            
-            System.out.println("\n" + "=".repeat(40));
-            System.out.println("STATISTIK:");
-            System.out.println("Tabellen: " + tableCount);
-            System.out.println("Views: " + viewCount);
-            System.out.println("Gesamt: " + (tableCount + viewCount));
-            System.out.println("=".repeat(40));
-            
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler beim Abrufen der Tabellen: " + e.getMessage());
-            // Nur Fehlermeldung
-        }
-    }
-    // ============================================================
-    // 12. Datenbank-Informationen
-    // ============================================================
-    private static void showDatabaseInfo(Connection conn) throws SQLException {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("DATENBANK-INFORMATIONEN");
-        System.out.println("=".repeat(60));
-        
-        DatabaseMetaData meta = conn.getMetaData();
-        
-        System.out.println("\n=== Verbindungsinformationen ===");
-        System.out.println("Datenbank: " + meta.getDatabaseProductName() 
-                         + " " + meta.getDatabaseProductVersion());
-        System.out.println("JDBC-Treiber: " + meta.getDriverName() 
-                         + " " + meta.getDriverVersion());
-        System.out.println("URL: " + meta.getURL());
-        System.out.println("Benutzer: " + meta.getUserName());
-        
-        // Statistiken
-        System.out.println("\n=== Datenbank-Statistiken ===");
-        
-        // Anzahl Tabellen
-        String[] tableTypes = {"TABLE"};
-        ResultSet tables = meta.getTables(null, "dbo", "%", tableTypes);
-        int tableCount = 0;
-        while (tables.next()) tableCount++;
-        tables.close();
-        
-        // Anzahl Views
-        String[] viewTypes = {"VIEW"};
-        ResultSet views = meta.getTables(null, "dbo", "%", viewTypes);
-        int viewCount = 0;
-        while (views.next()) viewCount++;
-        views.close();
-        
-        // Anzahl Stored Procedures
-        ResultSet procs = meta.getProcedures(null, "dbo", "%");
-        int procCount = 0;
-        while (procs.next()) procCount++;
-        procs.close();
-        
-        System.out.println("Tabellen: " + tableCount);
-        System.out.println("Views: " + viewCount);
-        System.out.println("Stored Procedures: " + procCount);
-        System.out.println("Gesamt Objekte: " + (tableCount + viewCount + procCount));
-        
-        // Größte Tabellen
-        System.out.println("\n=== Größte Tabellen (geschätzt) ===");
-        String sizeSQL = 
-            "SELECT TOP 5 t.name as TableName, " +
-            "       p.rows as RowCounts, " +
-            "       SUM(a.total_pages) * 8 / 1024 as TotalSpaceMB " +
-            "FROM sys.tables t " +
-            "INNER JOIN sys.indexes i ON t.object_id = i.object_id " +
-            "INNER JOIN sys.partitions p ON i.object_id = p.object_id AND i.index_id = p.index_id " +
-            "INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id " +
-            "WHERE t.is_ms_shipped = 0 " +
-            "GROUP BY t.name, p.rows " +
-            "ORDER BY RowCounts DESC";
-        
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sizeSQL)) {
-            
-            System.out.printf("\n%-25s %-15s %-15s%n", "Tabelle", "Zeilen", "Größe (MB)");
-            System.out.println("-".repeat(55));
-            
-            while (rs.next()) {
-                System.out.printf("%-25s %-15d %-15.2f%n",
-                    rs.getString("TableName"),
-                    rs.getInt("RowCounts"),
-                    rs.getDouble("TotalSpaceMB"));
-            }
-        }
-    }
+	 // ============================================================
+	 // 11. Tabellen anzeigen - Minimale Version
+	 // ============================================================
+	 private static void showAllTables(Connection conn) throws SQLException {
+	     System.out.println("\n" + "=".repeat(60));
+	     System.out.println("ALLE TABELLEN IN DER DATENBANK");
+	     System.out.println("=".repeat(60));
+	     
+	     // NUR TABELLEN (keine Views)
+	     String sql = "SELECT TABLE_NAME " +
+	                 "FROM INFORMATION_SCHEMA.TABLES " +
+	                 "WHERE TABLE_SCHEMA = 'dbo' " +
+	                 "AND TABLE_TYPE = 'BASE TABLE' " +
+	                 "ORDER BY TABLE_NAME";
+	     
+	     try (Statement stmt = conn.createStatement();
+	          ResultSet rs = stmt.executeQuery(sql)) {
+	         
+	         System.out.printf("\n%-35s %-15s%n", "Tabelle", "Typ");
+	         System.out.println("-".repeat(50));
+	         
+	         int tableCount = 0;
+	         
+	         while (rs.next()) {
+	             String tableName = rs.getString("TABLE_NAME");
+	             System.out.printf("%-35s %-15s%n", tableName, "BASE TABLE");
+	             tableCount++;
+	         }
+	         
+	         System.out.println("\n" + "=".repeat(50));
+	         System.out.println("STATISTIK:");
+	         System.out.println("Anzahl Tabellen: " + tableCount);
+	         System.out.println("=".repeat(50));
+	         
+	     } catch (SQLException e) {
+	         System.err.println("✗ Fehler beim Abrufen der Tabellen: " + e.getMessage());
+	     }
+	 }
+    
     
     // ============================================================
     // Hilfsmethoden für Fehlerbehandlung
@@ -964,429 +882,588 @@ public class EMMDatabaseManager {
         e.printStackTrace();
     }
     
- // ============================================================
- // 12. AUDITLOG anzeigen - NEUE METHODE
- // ============================================================
- private static void showAuditLog(Scanner scanner, Connection conn) {
-     System.out.println("\n" + "=".repeat(80));
-     System.out.println("AUDITLOG - ÄNDERUNGSPROTOKOLL");
-     System.out.println("=".repeat(80));
-     
-     System.out.println("\nFilteroptionen:");
-     System.out.println("1. Alle Einträge anzeigen");
-     System.out.println("2. Nur Statusänderungen von Endgeräten");
-     System.out.println("3. Letzte 24 Stunden");
-     System.out.println("4. Nach Datum filtern");
-     System.out.println("5. Nach Benutzer filtern");
-     System.out.print("\nWähle Filter (1-5): ");
-     
-     String filterChoice = scanner.nextLine();
-     
-     String sql = "SELECT * FROM AuditLog WHERE 1=1";
-     
-     switch (filterChoice) {
-         case "1":
-             // Kein zusätzlicher Filter
-             break;
-         case "2":
-             sql += " AND tabelle = 'Endgeraet' AND aktion = 'Statusänderung'";
-             break;
-         case "3":
-             sql += " AND zeitpunkt >= DATEADD(HOUR, -24, GETDATE())";
-             break;
-         case "4":
-             System.out.print("Startdatum (YYYY-MM-DD): ");
-             String startDate = scanner.nextLine();
-             System.out.print("Enddatum (YYYY-MM-DD, optional): ");
-             String endDate = scanner.nextLine();
-             
-             if (!startDate.isEmpty()) {
-                 sql += " AND CONVERT(DATE, zeitpunkt) >= '" + startDate + "'";
-             }
-             if (!endDate.isEmpty()) {
-                 sql += " AND CONVERT(DATE, zeitpunkt) <= '" + endDate + "'";
-             }
-             break;
-         case "5":
-             System.out.print("Benutzername (oder Teil): ");
-             String user = scanner.nextLine();
-             if (!user.isEmpty()) {
-                 sql += " AND benutzer LIKE '%" + user + "%'";
-             }
-             break;
-         default:
-             System.out.println("Ungültige Auswahl, zeige alle Einträge.");
-     }
-     
-     sql += " ORDER BY zeitpunkt DESC";
-     
-     System.out.print("\nAnzahl der Einträge (0 für alle): ");
-     String limitStr = scanner.nextLine();
-     int limit = 0;
-     try {
-         limit = Integer.parseInt(limitStr);
-         if (limit > 0) {
-             sql += " OFFSET 0 ROWS FETCH NEXT " + limit + " ROWS ONLY";
-         }
-     } catch (NumberFormatException e) {
-         // Kein Limit
-     }
-     
-     System.out.println("\n" + "=".repeat(120));
-     System.out.println("AUDITLOG EINTRÄGE");
-     System.out.println("=".repeat(120));
-     
-     try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(sql)) {
-         
-         System.out.printf("\n%-5s %-15s %-20s %-25s %-25s %-20s %-15s%n", 
-             "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt", "Benutzer");
-         System.out.println("-".repeat(125));
-         
-         int count = 0;
-         while (rs.next()) {
-             String alt = rs.getString("alt");
-             String neu = rs.getString("neu");
-             
-             // Kürze lange Werte für bessere Darstellung
-             if (alt != null && alt.length() > 20) alt = alt.substring(0, 17) + "...";
-             if (neu != null && neu.length() > 20) neu = neu.substring(0, 17) + "...";
-             
-             System.out.printf("%-5d %-15s %-20s %-25s %-25s %-20s %-15s%n",
-                 rs.getInt("id"),
-                 rs.getString("tabelle"),
-                 rs.getString("aktion"),
-                 (alt != null ? alt : "NULL"),
-                 (neu != null ? neu : "NULL"),
-                 rs.getTimestamp("zeitpunkt"),
-                 rs.getString("benutzer"));
-             count++;
-         }
-         
-         System.out.println("\n" + "=".repeat(60));
-         System.out.println("GESAMT: " + count + " AuditLog-Einträge");
-         System.out.println("=".repeat(60));
-         
-         // Zeige Statistik
-         showAuditLogStatistics(conn);
-         
-     } catch (SQLException e) {
-         System.err.println("✗ Fehler beim Abrufen des AuditLogs: " + e.getMessage());
-         System.err.println("SQL: " + sql);
-         
-         // Prüfe ob Tabelle existiert
-         checkAuditLogTable(conn);
-     }
- }
+	 // ============================================================
+	 // 12. AUDITLOG anzeigen - NEUE METHODE
+	 // ============================================================
+	 private static void showAuditLog(Scanner scanner, Connection conn) {
+	     System.out.println("\n" + "=".repeat(80));
+	     System.out.println("AUDITLOG - ÄNDERUNGSPROTOKOLL");
+	     System.out.println("=".repeat(80));
+	     
+	     System.out.println("\nFilteroptionen:");
+	     System.out.println("1. Alle Einträge anzeigen");
+	     System.out.println("2. Nur Statusänderungen von Endgeräten");
+	     System.out.println("3. Letzte 24 Stunden");
+	     System.out.println("4. Nach Datum filtern");
+	     System.out.println("5. Nach Benutzer filtern");
+	     System.out.print("\nWähle Filter (1-5): ");
+	     
+	     String filterChoice = scanner.nextLine();
+	     
+	     String sql = "SELECT * FROM AuditLog WHERE 1=1";
+	     
+	     switch (filterChoice) {
+	         case "1":
+	             // Kein zusätzlicher Filter
+	             break;
+	         case "2":
+	             sql += " AND tabelle = 'Endgeraet' AND aktion = 'Statusänderung'";
+	             break;
+	         case "3":
+	             sql += " AND zeitpunkt >= DATEADD(HOUR, -24, GETDATE())";
+	             break;
+	         case "4":
+	             System.out.print("Startdatum (YYYY-MM-DD): ");
+	             String startDate = scanner.nextLine();
+	             System.out.print("Enddatum (YYYY-MM-DD, optional): ");
+	             String endDate = scanner.nextLine();
+	             
+	             if (!startDate.isEmpty()) {
+	                 sql += " AND CONVERT(DATE, zeitpunkt) >= '" + startDate + "'";
+	             }
+	             if (!endDate.isEmpty()) {
+	                 sql += " AND CONVERT(DATE, zeitpunkt) <= '" + endDate + "'";
+	             }
+	             break;
+	         case "5":
+	             System.out.print("Benutzername (oder Teil): ");
+	             String user = scanner.nextLine();
+	             if (!user.isEmpty()) {
+	                 sql += " AND benutzer LIKE '%" + user + "%'";
+	             }
+	             break;
+	         default:
+	             System.out.println("Ungültige Auswahl, zeige alle Einträge.");
+	     }
+	     
+	     sql += " ORDER BY zeitpunkt DESC";
+	     
+	     System.out.print("\nAnzahl der Einträge (0 für alle): ");
+	     String limitStr = scanner.nextLine();
+	     int limit = 0;
+	     try {
+	         limit = Integer.parseInt(limitStr);
+	         if (limit > 0) {
+	             sql += " OFFSET 0 ROWS FETCH NEXT " + limit + " ROWS ONLY";
+	         }
+	     } catch (NumberFormatException e) {
+	         // Kein Limit
+	     }
+	     
+	     System.out.println("\n" + "=".repeat(120));
+	     System.out.println("AUDITLOG EINTRÄGE");
+	     System.out.println("=".repeat(120));
+	     
+	     try (Statement stmt = conn.createStatement();
+	          ResultSet rs = stmt.executeQuery(sql)) {
+	         
+	         System.out.printf("\n%-5s %-15s %-20s %-25s %-25s %-20s %-15s%n", 
+	             "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt", "Benutzer");
+	         System.out.println("-".repeat(125));
+	         
+	         int count = 0;
+	         while (rs.next()) {
+	             String alt = rs.getString("alt");
+	             String neu = rs.getString("neu");
+	             
+	             // Kürze lange Werte für bessere Darstellung
+	             if (alt != null && alt.length() > 20) alt = alt.substring(0, 17) + "...";
+	             if (neu != null && neu.length() > 20) neu = neu.substring(0, 17) + "...";
+	             
+	             System.out.printf("%-5d %-15s %-20s %-25s %-25s %-20s %-15s%n",
+	                 rs.getInt("id"),
+	                 rs.getString("tabelle"),
+	                 rs.getString("aktion"),
+	                 (alt != null ? alt : "NULL"),
+	                 (neu != null ? neu : "NULL"),
+	                 rs.getTimestamp("zeitpunkt"),
+	                 rs.getString("benutzer"));
+	             count++;
+	         }
+	         
+	         System.out.println("\n" + "=".repeat(60));
+	         System.out.println("GESAMT: " + count + " AuditLog-Einträge");
+	         System.out.println("=".repeat(60));
+	         
+	         // Zeige Statistik
+	         showAuditLogStatistics(conn);
+	         
+	     } catch (SQLException e) {
+	         System.err.println("✗ Fehler beim Abrufen des AuditLogs: " + e.getMessage());
+	         System.err.println("SQL: " + sql);
+	         
+	         // Prüfe ob Tabelle existiert
+	         checkAuditLogTable(conn);
+	     }
+	 }
 
- // ============================================================
- // Hilfsmethode für AuditLog-Statistik
- // ============================================================
- private static void showAuditLogStatistics(Connection conn) throws SQLException {
-     System.out.println("\n" + "-".repeat(60));
-     System.out.println("AUDITLOG STATISTIK");
-     System.out.println("-".repeat(60));
-     
-     // Statistik SQL
-     String statSql = 
-         "SELECT " +
-         "    COUNT(*) as TotalEntries, " +
-         "    COUNT(DISTINCT tabelle) as TablesTracked, " +
-         "    MIN(zeitpunkt) as FirstEntry, " +
-         "    MAX(zeitpunkt) as LastEntry, " +
-         "    COUNT(DISTINCT benutzer) as UsersTracked, " +
-         "    (SELECT COUNT(*) FROM AuditLog WHERE tabelle = 'Endgeraet' AND aktion = 'Statusänderung') as StatusChanges " +
-         "FROM AuditLog";
-     
-     try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(statSql)) {
-         
-         if (rs.next()) {
-             int total = rs.getInt("TotalEntries");
-             if (total > 0) {
-                 System.out.println("Gesamteinträge: " + total);
-                 System.out.println("Überwachte Tabellen: " + rs.getInt("TablesTracked"));
-                 System.out.println("Erster Eintrag: " + rs.getTimestamp("FirstEntry"));
-                 System.out.println("Letzter Eintrag: " + rs.getTimestamp("LastEntry"));
-                 System.out.println("Überwachte Benutzer: " + rs.getInt("UsersTracked"));
-                 System.out.println("Statusänderungen (Endgeräte): " + rs.getInt("StatusChanges"));
-                 
-                 // Top 5 Aktionen
-                 System.out.println("\nTop 5 Aktionen:");
-                 String topActionsSql = 
-                     "SELECT TOP 5 aktion, COUNT(*) as count " +
-                     "FROM AuditLog " +
-                     "GROUP BY aktion " +
-                     "ORDER BY count DESC";
-                 
-                 try (Statement stmt2 = conn.createStatement();
-                      ResultSet rs2 = stmt2.executeQuery(topActionsSql)) {
-                     
-                     while (rs2.next()) {
-                         System.out.println("  " + rs2.getString("aktion") + ": " + rs2.getInt("count"));
-                     }
-                 }
-             } else {
-                 System.out.println("Das AuditLog ist leer.");
-             }
-         }
-     }
- }
+	 // ============================================================
+	 // Hilfsmethode für AuditLog-Statistik
+	 // ============================================================
+	 private static void showAuditLogStatistics(Connection conn) throws SQLException {
+	     System.out.println("\n" + "-".repeat(60));
+	     System.out.println("AUDITLOG STATISTIK");
+	     System.out.println("-".repeat(60));
+	     
+	     // Statistik SQL
+	     String statSql = 
+	         "SELECT " +
+	         "    COUNT(*) as TotalEntries, " +
+	         "    COUNT(DISTINCT tabelle) as TablesTracked, " +
+	         "    MIN(zeitpunkt) as FirstEntry, " +
+	         "    MAX(zeitpunkt) as LastEntry, " +
+	         "    COUNT(DISTINCT benutzer) as UsersTracked, " +
+	         "    (SELECT COUNT(*) FROM AuditLog WHERE tabelle = 'Endgeraet' AND aktion = 'Statusänderung') as StatusChanges " +
+	         "FROM AuditLog";
+	     
+	     try (Statement stmt = conn.createStatement();
+	          ResultSet rs = stmt.executeQuery(statSql)) {
+	         
+	         if (rs.next()) {
+	             int total = rs.getInt("TotalEntries");
+	             if (total > 0) {
+	                 System.out.println("Gesamteinträge: " + total);
+	                 System.out.println("Überwachte Tabellen: " + rs.getInt("TablesTracked"));
+	                 System.out.println("Erster Eintrag: " + rs.getTimestamp("FirstEntry"));
+	                 System.out.println("Letzter Eintrag: " + rs.getTimestamp("LastEntry"));
+	                 System.out.println("Überwachte Benutzer: " + rs.getInt("UsersTracked"));
+	                 System.out.println("Statusänderungen (Endgeräte): " + rs.getInt("StatusChanges"));
+	                 
+	                 // Top 5 Aktionen
+	                 System.out.println("\nTop 5 Aktionen:");
+	                 String topActionsSql = 
+	                     "SELECT TOP 5 aktion, COUNT(*) as count " +
+	                     "FROM AuditLog " +
+	                     "GROUP BY aktion " +
+	                     "ORDER BY count DESC";
+	                 
+	                 try (Statement stmt2 = conn.createStatement();
+	                      ResultSet rs2 = stmt2.executeQuery(topActionsSql)) {
+	                     
+	                     while (rs2.next()) {
+	                         System.out.println("  " + rs2.getString("aktion") + ": " + rs2.getInt("count"));
+	                     }
+	                 }
+	             } else {
+	                 System.out.println("Das AuditLog ist leer.");
+	             }
+	         }
+	     }
+	 }
 
- // ============================================================
- // 13. AUDITLOG TEST - Trigger testen - NEUE METHODE
- // ============================================================
- private static void testAuditLogTrigger(Scanner scanner, Connection conn) {
-     System.out.println("\n" + "=".repeat(80));
-     System.out.println("AUDITLOG TRIGGER TEST");
-     System.out.println("=".repeat(80));
-     
-     System.out.println("\nDies testet den Trigger trg_GeräteStatusChange.");
-     System.out.println("Es wird ein Gerätestatus geändert, was einen AuditLog-Eintrag erzeugen sollte.");
-     
-     // 1. Suche ein Gerät zum Testen
-     System.out.println("\nSuche ein geeignetes Testgerät...");
-     
-     String findSql = 
-         "SELECT TOP 3 id, hersteller, modell, status " +
-         "FROM Endgeraet " +
-         "WHERE status IN ('LAGER', 'AKTIV') " +
-         "ORDER BY id";
-     
-     try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(findSql)) {
-         
-         System.out.println("\nVerfügbare Testgeräte:");
-         System.out.printf("%-5s %-15s %-15s %-10s%n", "ID", "Hersteller", "Modell", "Status");
-         System.out.println("-".repeat(45));
-         
-         while (rs.next()) {
-             System.out.printf("%-5d %-15s %-15s %-10s%n",
-                 rs.getInt("id"),
-                 rs.getString("hersteller"),
-                 rs.getString("modell"),
-                 rs.getString("status"));
-         }
-     } catch (SQLException e) {
-         System.err.println("✗ Fehler beim Suchen von Geräten: " + e.getMessage());
-         return;
-     }
-     
-     System.out.print("\nGeräte-ID für Test: ");
-     String deviceIdStr = scanner.nextLine();
-     
-     System.out.print("Neuer Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN): ");
-     String newStatus = scanner.nextLine().toUpperCase();
-     
-     if (!isValidStatus(newStatus)) {
-         System.out.println("✗ Ungültiger Status! Erlaubt: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
-         return;
-     }
-     
-     try {
-         int deviceId = Integer.parseInt(deviceIdStr);
-         
-         // 1. Aktuellen Status abrufen (vor Änderung)
-         String currentStatus = getDeviceStatus(conn, deviceId);
-         if (currentStatus == null) {
-             System.out.println("✗ Gerät mit ID " + deviceId + " nicht gefunden.");
-             return;
-         }
-         
-         System.out.println("\n=== TEST VORBEREITUNG ===");
-         System.out.println("Gerät ID: " + deviceId);
-         System.out.println("Aktueller Status: " + currentStatus);
-         System.out.println("Neuer Status: " + newStatus);
-         
-         if (currentStatus.equals(newStatus)) {
-             System.out.println("\n⚠️  Status ist bereits " + newStatus + ". Wähle einen anderen Status.");
-             return;
-         }
-         
-         // 2. Aktuelle AuditLog-Einträge zählen (vor Änderung)
-         int auditCountBefore = getAuditLogCount(conn);
-         System.out.println("AuditLog-Einträge vorher: " + auditCountBefore);
-         
-         System.out.println("\n=== FÜHRE STATUSÄNDERUNG DURCH ===");
-         
-         // 3. Status ändern (dies sollte den Trigger auslösen)
-         String updateSql = "UPDATE Endgeraet SET status = ? WHERE id = ?";
-         try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
-             pstmt.setString(1, newStatus);
-             pstmt.setInt(2, deviceId);
-             
-             int rowsAffected = pstmt.executeUpdate();
-             System.out.println("UPDATE ausgeführt. Betroffene Zeilen: " + rowsAffected);
-             
-             if (rowsAffected > 0) {
-                 // 4. Warten (für bessere Sichtbarkeit in Logs)
-                 Thread.sleep(1000);
-                 
-                 // 5. AuditLog-Einträge nachher zählen
-                 int auditCountAfter = getAuditLogCount(conn);
-                 System.out.println("AuditLog-Einträge nachher: " + auditCountAfter);
-                 
-                 int newEntries = auditCountAfter - auditCountBefore;
-                 System.out.println("Neue AuditLog-Einträge: " + newEntries);
-                 
-                 if (newEntries > 0) {
-                     System.out.println("\n✓ ERFOLG: Trigger wurde ausgelöst!");
-                     
-                     // 6. Zeige die neuen AuditLog-Einträge an
-                     System.out.println("\n=== NEUE AUDITLOG-EINTRÄGE ===");
-                     String newAuditSql = 
-                         "SELECT TOP " + newEntries + " * " +
-                         "FROM AuditLog " +
-                         "ORDER BY id DESC";
-                     
-                     try (Statement stmt = conn.createStatement();
-                          ResultSet rs = stmt.executeQuery(newAuditSql)) {
-                         
-                         System.out.printf("\n%-5s %-15s %-20s %-15s %-15s %-20s%n", 
-                             "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt");
-                         System.out.println("-".repeat(90));
-                         
-                         while (rs.next()) {
-                             System.out.printf("%-5d %-15s %-20s %-15s %-15s %-20s%n",
-                                 rs.getInt("id"),
-                                 rs.getString("tabelle"),
-                                 rs.getString("aktion"),
-                                 rs.getString("alt"),
-                                 rs.getString("neu"),
-                                 rs.getTimestamp("zeitpunkt"));
-                         }
-                     }
-                     
-                     // 7. Status zurückändern (für weitere Tests)
-                     System.out.print("\nStatus zurücksetzen auf '" + currentStatus + "'? (j/n): ");
-                     String resetChoice = scanner.nextLine().toLowerCase();
-                     
-                     if (resetChoice.equals("j") || resetChoice.equals("ja")) {
-                         try (PreparedStatement pstmt2 = conn.prepareStatement(updateSql)) {
-                             pstmt2.setString(1, currentStatus);
-                             pstmt2.setInt(2, deviceId);
-                             pstmt2.executeUpdate();
-                             System.out.println("✓ Status zurückgesetzt auf: " + currentStatus);
-                         }
-                     }
-                     
-                 } else {
-                     System.out.println("\n✗ FEHLER: Keine neuen AuditLog-Einträge erstellt!");
-                     System.out.println("Mögliche Ursachen:");
-                     System.out.println("1. Trigger ist nicht aktiv oder fehlerhaft");
-                     System.out.println("2. AuditLog-Tabelle existiert nicht");
-                     System.out.println("3. Benutzer hat keine INSERT-Rechte auf AuditLog");
-                 }
-             }
-         }
-         
-     } catch (NumberFormatException e) {
-         System.out.println("✗ Ungültige Geräte-ID!");
-     } catch (SQLException e) {
-         System.err.println("✗ SQL Fehler: " + e.getMessage());
-         if (e.getErrorCode() == 544) { // CHECK constraint violation
-             System.err.println("Status muss einer der folgenden sein: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
-         }
-     } catch (InterruptedException e) {
-         System.err.println("✗ Sleep unterbrochen: " + e.getMessage());
-     }
- }
-
- // ============================================================
- // Hilfsmethoden für AuditLog
- // ============================================================
- private static boolean isValidStatus(String status) {
-     return status.equals("LAGER") || status.equals("AKTIV") || 
-            status.equals("DEFEKT") || status.equals("AUSGESCHIEDEN");
- }
-
- private static String getDeviceStatus(Connection conn, int deviceId) throws SQLException {
-     String sql = "SELECT status FROM Endgeraet WHERE id = ?";
-     try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-         pstmt.setInt(1, deviceId);
-         ResultSet rs = pstmt.executeQuery();
-         if (rs.next()) {
-             return rs.getString("status");
-         }
-     }
-     return null;
- }
-
- private static int getAuditLogCount(Connection conn) throws SQLException {
-     String sql = "SELECT COUNT(*) as count FROM AuditLog";
-     try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(sql)) {
-         if (rs.next()) {
-             return rs.getInt("count");
-         }
-     }
-     return 0;
- }
-
- private static void checkAuditLogTable(Connection conn) {
-     System.out.println("\n=== PRÜFE AUDITLOG-TABELLE ===");
-     
-     String[] checkQueries = {
-         "SELECT COUNT(*) as exists_flag FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AuditLog'",
-         "SELECT COUNT(*) as column_count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'AuditLog'",
-         "SELECT name FROM sys.triggers WHERE name = 'trg_GeräteStatusChange'"
-     };
-     
-     String[] messages = {
-         "AuditLog-Tabelle existiert: ",
-         "Spalten in AuditLog: ",
-         "Trigger 'trg_GeräteStatusChange' existiert: "
-     };
-     
-     try {
-         for (int i = 0; i < checkQueries.length; i++) {
-             try (Statement stmt = conn.createStatement();
-                  ResultSet rs = stmt.executeQuery(checkQueries[i])) {
-                 if (rs.next()) {
-                     Object result = rs.getObject(1);
-                     System.out.println(messages[i] + result);
-                 }
-             }
-         }
-         
-         // Prüfe ob Trigger auf Endgeraet-Tabelle aktiv ist
-         String triggerCheck = 
-             "SELECT COUNT(*) as has_trigger " +
-             "FROM sys.triggers t " +
-             "JOIN sys.objects o ON t.parent_id = o.object_id " +
-             "WHERE t.name = 'trg_GeräteStatusChange' " +
-             "AND o.name = 'Endgeraet'";
-         
-         try (Statement stmt = conn.createStatement();
-              ResultSet rs = stmt.executeQuery(triggerCheck)) {
-             if (rs.next() && rs.getInt("has_trigger") > 0) {
-                 System.out.println("✓ Trigger ist auf Endgeraet-Tabelle registriert");
-             } else {
-                 System.out.println("✗ Trigger nicht auf Endgeraet gefunden");
-             }
-         }
-         
-     } catch (SQLException e) {
-         System.err.println("Fehler beim Prüfen der AuditLog-Struktur: " + e.getMessage());
-     }
- 	}
-    
-    private static void closeResources(Scanner scanner, Connection conn) {
-        try {
-            if (scanner != null) {
-                scanner.close();
-            }
-        } catch (Exception e) {
-            System.err.println("Fehler beim Schließen des Scanners: " + e.getMessage());
-        }
-        
-        try {
-            if (conn != null && !conn.isClosed()) {
-                conn.close();
-                System.out.println("\n✓ Verbindung ordnungsgemäß geschlossen.");
-            }
-        } catch (SQLException e) {
-            System.err.println("Fehler beim Schließen der Verbindung: " + e.getMessage());
-        }
-    }
+	// ============================================================
+	// 13. AUDITLOG TEST - Trigger testen
+	// ============================================================
+	private static void testAuditLogTrigger(Scanner scanner, Connection conn) {
+	    System.out.println("\n" + "=".repeat(80));
+	    System.out.println("AUDITLOG TRIGGER TEST");
+	    System.out.println("=".repeat(80));
+	    
+	    System.out.println("\nDies testet den Trigger trg_GeräteStatusChange.");
+	    System.out.println("Es wird ein Gerätestatus geändert, was einen AuditLog-Eintrag erzeugen sollte.");
+	    
+	    // 1. Suche ein Gerät zum Testen
+	    System.out.println("\nSuche ein geeignetes Testgerät...");
+	    
+	    // DIESE QUERY IST SICHER (keine Benutzereingaben)
+	    String findSql = 
+	        "SELECT TOP 3 id, hersteller, modell, status " +
+	        "FROM Endgeraet " +
+	        "WHERE status IN ('LAGER', 'AKTIV') " +
+	        "ORDER BY id";
+	    
+	    try (Statement stmt = conn.createStatement();
+	         ResultSet rs = stmt.executeQuery(findSql)) {
+	        
+	        System.out.println("\nVerfügbare Testgeräte:");
+	        System.out.printf("%-5s %-15s %-15s %-10s%n", "ID", "Hersteller", "Modell", "Status");
+	        System.out.println("-".repeat(45));
+	        
+	        while (rs.next()) {
+	            System.out.printf("%-5d %-15s %-15s %-10s%n",
+	                rs.getInt("id"),
+	                rs.getString("hersteller"),
+	                rs.getString("modell"),
+	                rs.getString("status"));
+	        }
+	    } catch (SQLException e) {
+	        System.err.println("✗ Fehler beim Suchen von Geräten: " + e.getMessage());
+	        return;
+	    }
+	    
+	    System.out.print("\nGeräte-ID für Test: ");
+	    String deviceIdStr = scanner.nextLine();
+	    
+	    System.out.print("Neuer Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN): ");
+	    String newStatus = scanner.nextLine().toUpperCase();
+	    
+	    if (!isValidStatus(newStatus)) {
+	        System.out.println("✗ Ungültiger Status! Erlaubt: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
+	        return;
+	    }
+	    
+	    try {
+	        int deviceId = Integer.parseInt(deviceIdStr);
+	        
+	        // 1. Aktuellen Status abrufen (vor Änderung)
+	        String currentStatus = getDeviceStatus(conn, deviceId);
+	        if (currentStatus == null) {
+	            System.out.println("✗ Gerät mit ID " + deviceId + " nicht gefunden.");
+	            return;
+	        }
+	        
+	        System.out.println("\n=== TEST VORBEREITUNG ===");
+	        System.out.println("Gerät ID: " + deviceId);
+	        System.out.println("Aktueller Status: " + currentStatus);
+	        System.out.println("Neuer Status: " + newStatus);
+	        
+	        if (currentStatus.equals(newStatus)) {
+	            System.out.println("\n⚠️  Status ist bereits " + newStatus + ". Wähle einen anderen Status.");
+	            return;
+	        }
+	        
+	        // 2. Aktuelle AuditLog-Einträge zählen (vor Änderung)
+	        int auditCountBefore = getAuditLogCount(conn);
+	        System.out.println("AuditLog-Einträge vorher: " + auditCountBefore);
+	        
+	        System.out.println("\n=== FÜHRE STATUSÄNDERUNG DURCH ===");
+	        
+	        // 3. Status ändern (dies sollte den Trigger auslösen)
+	        String updateSql = "UPDATE Endgeraet SET status = ? WHERE id = ?";
+	        try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+	            pstmt.setString(1, newStatus);
+	            pstmt.setInt(2, deviceId);
+	            
+	            int rowsAffected = pstmt.executeUpdate();
+	            System.out.println("UPDATE ausgeführt. Betroffene Zeilen: " + rowsAffected);
+	            
+	            if (rowsAffected > 0) {
+	                // 4. Warten (für bessere Sichtbarkeit in Logs)
+	                Thread.sleep(1000);
+	                
+	                // 5. AuditLog-Einträge nachher zählen
+	                int auditCountAfter = getAuditLogCount(conn);
+	                System.out.println("AuditLog-Einträge nachher: " + auditCountAfter);
+	                
+	                int newEntries = auditCountAfter - auditCountBefore;
+	                System.out.println("Neue AuditLog-Einträge: " + newEntries);
+	                
+	                if (newEntries > 0) {
+	                    System.out.println("\n✓ ERFOLG: Trigger wurde ausgelöst!");
+	                    
+	                    // 6. Zeige die neuen AuditLog-Einträge
+	                    System.out.println("\n=== NEUE AUDITLOG-EINTRÄGE ===");
+	                    
+	                    // FETCH NEXT mit ROW_NUMBER() (für SQL Server)
+	                    String newAuditSql = 
+	                        "SELECT * FROM (" +
+	                        "    SELECT *, ROW_NUMBER() OVER (ORDER BY id DESC) as rn " +
+	                        "    FROM AuditLog " +
+	                        ") as numbered " +
+	                        "WHERE rn <= ? " +
+	                        "ORDER BY id DESC";
+	                    
+	                    try (PreparedStatement pstmt2 = conn.prepareStatement(newAuditSql)) {
+	                        pstmt2.setInt(1, newEntries);
+	                        
+	                        try (ResultSet rs = pstmt2.executeQuery()) {
+	                            System.out.printf("\n%-5s %-15s %-20s %-15s %-15s %-20s%n", 
+	                                "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt");
+	                            System.out.println("-".repeat(90));
+	                            
+	                            while (rs.next()) {
+	                                System.out.printf("%-5d %-15s %-20s %-15s %-15s %-20s%n",
+	                                    rs.getInt("id"),
+	                                    rs.getString("tabelle"),
+	                                    rs.getString("aktion"),
+	                                    rs.getString("alt"),
+	                                    rs.getString("neu"),
+	                                    rs.getTimestamp("zeitpunkt"));
+	                            }
+	                        }
+	                    }
+	                    
+	                    // 7. Status zurückändern (für weitere Tests)
+	                    System.out.print("\nStatus zurücksetzen auf '" + currentStatus + "'? (j/n): ");
+	                    String resetChoice = scanner.nextLine().toLowerCase();
+	                    
+	                    if (resetChoice.equals("j") || resetChoice.equals("ja")) {
+	                        try (PreparedStatement pstmt3 = conn.prepareStatement(updateSql)) {
+	                            pstmt3.setString(1, currentStatus);
+	                            pstmt3.setInt(2, deviceId);
+	                            pstmt3.executeUpdate();
+	                            System.out.println("✓ Status zurückgesetzt auf: " + currentStatus);
+	                        }
+	                    }
+	                    
+	                } else {
+	                    System.out.println("\n✗ FEHLER: Keine neuen AuditLog-Einträge erstellt!");
+	                    System.out.println("Mögliche Ursachen:");
+	                    System.out.println("1. Trigger ist nicht aktiv oder fehlerhaft");
+	                    System.out.println("2. AuditLog-Tabelle existiert nicht");
+	                    System.out.println("3. Benutzer hat keine INSERT-Rechte auf AuditLog");
+	                }
+	            }
+	        }
+	        
+	    } catch (NumberFormatException e) {
+	        System.out.println("✗ Ungültige Geräte-ID!");
+	    } catch (SQLException e) {
+	        System.err.println("✗ SQL Fehler: " + e.getMessage());
+	        if (e.getErrorCode() == 544) { // CHECK constraint violation
+	            System.err.println("Status muss einer der folgenden sein: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
+	        }
+	    } catch (InterruptedException e) {
+	        System.err.println("✗ Sleep unterbrochen: " + e.getMessage());
+	    }
+	}
+	 // ============================================================
+	 // Hilfsmethoden für AuditLog
+	 // ============================================================
+	 private static boolean isValidStatus(String status) {
+	     return status.equals("LAGER") || status.equals("AKTIV") || 
+	        status.equals("DEFEKT") || status.equals("AUSGESCHIEDEN");
+	 }
+	
+	 private static String getDeviceStatus(Connection conn, int deviceId) throws SQLException {
+	     String sql = "SELECT status FROM Endgeraet WHERE id = ?";
+	 try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+	     pstmt.setInt(1, deviceId);
+	     ResultSet rs = pstmt.executeQuery();
+	     if (rs.next()) {
+	         return rs.getString("status");
+	         }
+	     }
+	     return null;
+	 }
+	
+	 private static int getAuditLogCount(Connection conn) throws SQLException {
+	     String sql = "SELECT COUNT(*) as count FROM AuditLog";
+	 try (Statement stmt = conn.createStatement();
+	      ResultSet rs = stmt.executeQuery(sql)) {
+	     if (rs.next()) {
+	         return rs.getInt("count");
+	         }
+	     }
+	     return 0;
+	 }
+	
+	 private static void checkAuditLogTable(Connection conn) {
+	     System.out.println("\n=== PRÜFE AUDITLOG-TABELLE ===");
+	 
+	 String[] checkQueries = {
+	     "SELECT COUNT(*) as exists_flag FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AuditLog'",
+	     "SELECT COUNT(*) as column_count FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'AuditLog'",
+	     "SELECT name FROM sys.triggers WHERE name = 'trg_GeräteStatusChange'"
+	 };
+	 
+	 String[] messages = {
+	     "AuditLog-Tabelle existiert: ",
+	     "Spalten in AuditLog: ",
+	     "Trigger 'trg_GeräteStatusChange' existiert: "
+	 };
+	 
+	 try {
+	     for (int i = 0; i < checkQueries.length; i++) {
+	         try (Statement stmt = conn.createStatement();
+	              ResultSet rs = stmt.executeQuery(checkQueries[i])) {
+	             if (rs.next()) {
+	                 Object result = rs.getObject(1);
+	                 System.out.println(messages[i] + result);
+	             }
+	         }
+	     }
+	     
+	     // Prüfe ob Trigger auf Endgeraet-Tabelle aktiv ist
+	     String triggerCheck = 
+	         "SELECT COUNT(*) as has_trigger " +
+	         "FROM sys.triggers t " +
+	         "JOIN sys.objects o ON t.parent_id = o.object_id " +
+	         "WHERE t.name = 'trg_GeräteStatusChange' " +
+	         "AND o.name = 'Endgeraet'";
+	     
+	     try (Statement stmt = conn.createStatement();
+	          ResultSet rs = stmt.executeQuery(triggerCheck)) {
+	         if (rs.next() && rs.getInt("has_trigger") > 0) {
+	             System.out.println("✓ Trigger ist auf Endgeraet-Tabelle registriert");
+	         } else {
+	             System.out.println("✗ Trigger nicht auf Endgeraet gefunden");
+	         }
+	     }
+	     
+	 } catch (SQLException e) {
+	     System.err.println("Fehler beim Prüfen der AuditLog-Struktur: " + e.getMessage());
+	 }
+	}
+	
+	private static void closeResources(Scanner scanner, Connection conn) {
+	    try {
+	        if (scanner != null) {
+	            scanner.close();
+	        }
+	    } catch (Exception e) {
+	        System.err.println("Fehler beim Schließen des Scanners: " + e.getMessage());
+	    }
+	    
+	    try {
+	        if (conn != null && !conn.isClosed()) {
+	            conn.close();
+	            System.out.println("\n✓ Verbindung ordnungsgemäß geschlossen.");
+	        }
+	    } catch (SQLException e) {
+	        System.err.println("Fehler beim Schließen der Verbindung: " + e.getMessage());
+	    }
+}
+	 
+	// ============================================================
+	// 14. Datenbank-Informationen
+	// ============================================================
+	private static void showDatabaseInfo(Connection conn) throws SQLException {
+	    System.out.println("\n" + "=".repeat(60));
+	    System.out.println("DATENBANK-INFORMATIONEN");
+	    System.out.println("=".repeat(60));
+	    
+	    DatabaseMetaData meta = conn.getMetaData();
+	    
+	    System.out.println("\n=== Verbindungsinformationen ===");
+	    System.out.println("Datenbank: " + meta.getDatabaseProductName() 
+	                     + " " + meta.getDatabaseProductVersion());
+	    System.out.println("JDBC-Treiber: " + meta.getDriverName() 
+	                     + " " + meta.getDriverVersion());
+	    System.out.println("URL: " + meta.getURL());
+	    System.out.println("Benutzer: " + meta.getUserName());
+	    
+	    // Statistiken
+	    System.out.println("\n=== Datenbank-Statistiken ===");
+	    
+	    // Tabellen auflisten und zählen
+	    int tableCount = 0;
+	    System.out.println("\n=== TABELLEN ===");
+	    
+	    try (Statement stmt = conn.createStatement();
+	         ResultSet rs = stmt.executeQuery(
+	             "SELECT name, type_desc, create_date " +
+	             "FROM sys.objects " +
+	             "WHERE type = 'U' " +  // U = User table
+	             "AND is_ms_shipped = 0 " +
+	             "ORDER BY name")) {
+	        
+	        System.out.printf("\n%-35s %-20s%n", "Name", "Typ");
+	        System.out.println("-".repeat(55));
+	        
+	        while (rs.next()) {
+	            String name = rs.getString("name");
+	            String type = rs.getString("type_desc");
+	            
+	            System.out.printf("%-35s %-20s%n", name, type);
+	            tableCount++;
+	        }
+	        
+	        if (tableCount == 0) {
+	            System.out.println("Keine Tabellen gefunden.");
+	        } else {
+	            System.out.println("\nAnzahl: " + tableCount + " Tabelle(n)");
+	        }
+	        
+	    } catch (SQLException e) {
+	        System.out.println("Kann Tabellen nicht auflisten: " + e.getMessage());
+	        // Fallback: Einfache Zählung über DatabaseMetaData
+	        String[] tableTypes = {"TABLE"};
+	        ResultSet tables = meta.getTables(null, "dbo", "%", tableTypes);
+	        while (tables.next()) tableCount++;
+	        tables.close();
+	    }
+	    
+	    // Views auflisten und zählen
+	    int viewCount = 0;
+	    System.out.println("\n=== VIEWS ===");
+	    
+	    try (Statement stmt = conn.createStatement();
+	         ResultSet rs = stmt.executeQuery(
+	             "SELECT name, type_desc, create_date " +
+	             "FROM sys.objects " +
+	             "WHERE type = 'V' " +  // V = View
+	             "AND is_ms_shipped = 0 " +  // Nur benutzerdefinierte Views
+	             "ORDER BY name")) {
+	        
+	        System.out.printf("\n%-35s %-20s%n", "Name", "Typ");
+	        System.out.println("-".repeat(55));
+	        
+	        while (rs.next()) {
+	            String name = rs.getString("name");
+	            String type = rs.getString("type_desc");
+	            
+	            System.out.printf("%-35s %-20s%n", name, type);
+	            viewCount++;
+	        }
+	        
+	        if (viewCount == 0) {
+	            System.out.println("Keine Views gefunden.");
+	        } else {
+	            System.out.println("\nAnzahl: " + viewCount + " View(s)");
+	        }
+	        
+	    } catch (SQLException e) {
+	        System.out.println("Kann Views nicht auflisten: " + e.getMessage());
+	        // Fallback: Einfache Zählung
+	        try (Statement stmt2 = conn.createStatement();
+	             ResultSet rs2 = stmt2.executeQuery(
+	                 "SELECT COUNT(*) as view_count " +
+	                 "FROM sys.objects " +
+	                 "WHERE type = 'V' " +
+	                 "AND is_ms_shipped = 0")) {
+	            if (rs2.next()) {
+	                viewCount = rs2.getInt("view_count");
+	            }
+	        }
+	    }
+	    
+	    // Stored Procedures auflisten und zählen (filtere Diagramm-Prozeduren heraus)
+	    int userProcCount = 0;
+	    System.out.println("\n=== BENUTZERDEFINIERTE STORED PROCEDURES ===");
+	    
+	    try (Statement stmt = conn.createStatement();
+	         ResultSet rs = stmt.executeQuery(
+	             "SELECT name, type_desc, create_date " +
+	             "FROM sys.objects " +
+	             "WHERE type IN ('P', 'PC') " +  	// P = SQL Stored Procedure, PC = CLR Stored Procedure
+	             "AND is_ms_shipped = 0 " +       	// Nur benutzerdefinierte
+	             "AND name NOT LIKE '%diagram%' " + // Filtere Diagramm-Prozeduren heraus
+	             "AND name NOT LIKE '%Diagram%' " + // Großbuchstaben auch
+	             "ORDER BY name")) {
+	        
+	        System.out.printf("\n%-35s %-20s%n", "Name", "Typ");
+	        System.out.println("-".repeat(55));
+	        
+	        while (rs.next()) {
+	            String name = rs.getString("name");
+	            String type = rs.getString("type_desc");
+	            
+	            System.out.printf("%-35s %-20s%n", name, type);
+	            userProcCount++;
+	        }
+	        
+	        if (userProcCount == 0) {
+	            System.out.println("Keine benutzerdefinierten Stored Procedures gefunden.");
+	        } else {
+	            System.out.println("\nAnzahl: " + userProcCount + " benutzerdefinierte Stored Procedure(s)");
+	        }
+	        
+	    } catch (SQLException e) {
+	        System.out.println("Kann Stored Procedures nicht auflisten: " + e.getMessage());
+	        // Fallback: Einfache Zählung
+	        try (Statement stmt2 = conn.createStatement();
+	             ResultSet rs2 = stmt2.executeQuery(
+	                 "SELECT COUNT(*) as proc_count " +
+	                 "FROM sys.objects " +
+	                 "WHERE type IN ('P', 'PC') " +
+	                 "AND is_ms_shipped = 0 " +
+	                 "AND name NOT LIKE '%diagram%' " +
+	                 "AND name NOT LIKE '%Diagram%'")) {
+	            if (rs2.next()) {
+	                userProcCount = rs2.getInt("proc_count");
+	            }
+	        }
+	    }
+	}
 }
