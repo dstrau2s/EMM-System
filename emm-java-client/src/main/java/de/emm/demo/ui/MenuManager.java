@@ -1,36 +1,34 @@
-// MenuManager.java (vollständige Version mit allen Funktionen)
+// MenuManager.java (vollständig mit Services)
 package de.emm.demo.ui;
 
-//import de.emm.demo.model.AuditLogEntry;
-//import de.emm.demo.model.Device;
-import de.emm.demo.repository.DeviceRepository;
-import de.emm.demo.repository.AuditRepository;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Types;
-import java.sql.CallableStatement;
-import java.sql.ResultSet;
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.sql.ResultSetMetaData;
+import de.emm.demo.dto.CreateDeviceRequest;
+import de.emm.demo.dto.DeviceResponse;
+import de.emm.demo.exception.EMMException;
+import de.emm.demo.service.DeviceService;
+import de.emm.demo.service.ComplianceService;
+import de.emm.demo.service.ReportService;
+
+import java.sql.*;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
 public class MenuManager {
     
     private final Scanner scanner;
-    private final DeviceRepository deviceRepo;
-    private final AuditRepository auditRepo;
-    private final Connection connection;
+    private final DeviceService deviceService;
+    private final ComplianceService complianceService;
+    private final ReportService reportService;
+    private final Connection connection; // Für direkte DB-Abfragen
     private boolean running = true;
     
-    public MenuManager(Scanner scanner, DeviceRepository deviceRepo, 
-                      AuditRepository auditRepo, Connection connection) {
+    public MenuManager(Scanner scanner, DeviceService deviceService, 
+                      ComplianceService complianceService, ReportService reportService,
+                      Connection connection) {
         this.scanner = scanner;
-        this.deviceRepo = deviceRepo;
-        this.auditRepo = auditRepo;
+        this.deviceService = deviceService;
+        this.complianceService = complianceService;
+        this.reportService = reportService;
         this.connection = connection;
     }
     
@@ -44,54 +42,55 @@ public class MenuManager {
     
     private void showMainMenu() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("=== EMM DATENBANK-MANAGER ===");
+        System.out.println("=== EMM DATENBANK-MANAGER (Service-Version) ===");
         System.out.println("=".repeat(60));
-        System.out.println(" 1. sp_NeuesGerätErfassen - Neues Gerät erfassen");
-        System.out.println(" 2. sp_GerätEntfernen_Einfach - Gerät entfernen (Soft-Delete)");
-        System.out.println(" 3. sp_GerätAusgeben - Gerät an Mitarbeiter ausgeben");
-        System.out.println(" 4. sp_GerätZuruecknehmen - Gerät zurücknehmen");
-        System.out.println(" 5. sp_GetMitarbeiterGeräte - Geräte eines Mitarbeiters");
-        System.out.println(" 6. sp_GetVerfügbareGeräte - Verfügbare Geräte im Lager");
-        System.out.println(" 7. sp_Monatsreport - Monatlichen Kostenreport");
-        System.out.println(" 8. sp_DemoComplianceCheck - Compliance-Check für Richtlinie");
-        System.out.println(" 9. sp_AlleComplianceChecks - Alle Compliance-Checks");
+        System.out.println(" 1. Neues Gerät erfassen");
+        System.out.println(" 2. Gerät entfernen (Soft-Delete)");
+        System.out.println(" 3. Gerät an Mitarbeiter ausgeben");
+        System.out.println(" 4. Gerät zurücknehmen");
+        System.out.println(" 5. Geräte eines Mitarbeiters anzeigen");
+        System.out.println(" 6. Verfügbare Geräte im Lager anzeigen");
+        System.out.println(" 7. Monatlichen Kostenreport generieren");
+        System.out.println(" 8. Compliance-Check für Richtlinie");
+        System.out.println(" 9. Alle Compliance-Checks durchführen");
         System.out.println("10. Views anzeigen (V_AktiveGeräte, V_KostenProAbteilung, etc.)");
         System.out.println("11. Tabellen anzeigen (Endgeraet, Mitarbeiter, etc.)");
         System.out.println("12. AUDITLOG - Änderungsprotokoll anzeigen");
         System.out.println("13. AUDITLOG TEST - Trigger testen");
         System.out.println("14. Datenbank-Informationen");
-        System.out.println("15. Beenden");
-        System.out.print("\nWähle eine Option (1-15): ");
+        System.out.println("15. Gerätestatistiken");
+        System.out.println("16. Beenden");
+        System.out.print("\nWähle eine Option (1-16): ");
     }
     
     private void handleMenuChoice(String choice) {
         switch (choice) {
             case "1":
-                call_sp_NeuesGerätErfassen();
+                createNewDevice();
                 break;
             case "2":
-                call_sp_GerätEntfernen_Einfach();
+                removeDevice();
                 break;
             case "3":
-                call_sp_GerätAusgeben();
+                assignDeviceToEmployee();
                 break;
             case "4":
-                call_sp_GerätZuruecknehmen();
+                returnDevice();
                 break;
             case "5":
-                call_sp_GetMitarbeiterGeräte();
+                getEmployeeDevices();
                 break;
             case "6":
-                call_sp_GetVerfügbareGeräte();
+                getAvailableDevices();
                 break;
             case "7":
-                call_sp_Monatsreport();
+                generateMonthlyReport();
                 break;
             case "8":
-                call_sp_DemoComplianceCheck();
+                performComplianceCheck();
                 break;
             case "9":
-                call_sp_AlleComplianceChecks();
+                performAllComplianceChecks();
                 break;
             case "10":
                 showAllViews();
@@ -109,192 +108,176 @@ public class MenuManager {
                 showDatabaseInfo();
                 break;
             case "15":
+                showDeviceStatistics();
+                break;
+            case "16":
                 System.out.println("\nProgramm wird beendet. Auf Wiedersehen!");
                 running = false;
                 break;
             default:
-                System.out.println("Ungültige Eingabe! Bitte 1-15 wählen.");
+                System.out.println("Ungültige Eingabe! Bitte 1-16 wählen.");
         }
     }
     
     // ============================================================
-    // 1. sp_NeuesGerätErfassen
+    // 1. Neues Gerät erfassen (mit Service)
     // ============================================================
-    private void call_sp_NeuesGerätErfassen() {
+    private void createNewDevice() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_NEUESGERÄTERFASSEN - Neues Gerät erfassen");
+        System.out.println("NEUES GERÄT ERFASSEN");
         System.out.println("=".repeat(60));
-        
-        System.out.print("Hersteller (z.B. Apple, Samsung, Dell): ");
-        String hersteller = scanner.nextLine();
-        
-        System.out.print("Modell (z.B. iPhone 15, Galaxy S24, XPS 13): ");
-        String modell = scanner.nextLine();
-        
-        System.out.print("Betriebssystem (Windows, iOS, Android, macOS): ");
-        String os = scanner.nextLine();
-        
-        System.out.print("OS Version (z.B. 17.2, 14, 23H2): ");
-        String version = scanner.nextLine();
-        
-        System.out.print("IMEI/Seriennummer: ");
-        String imei = scanner.nextLine();
-        
-        System.out.print("Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN) [LAGER]: ");
-        String status = scanner.nextLine();
-        if (status.isEmpty()) status = "LAGER";
-        
-        System.out.println("\nErfasse neues Gerät...");
-        
-        try (CallableStatement cstmt = connection.prepareCall("{call sp_NeuesGerätErfassen(?, ?, ?, ?, ?, ?)}")) {
-            cstmt.setString(1, hersteller);
-            cstmt.setString(2, modell);
-            cstmt.setString(3, os);
-            cstmt.setString(4, version);
-            cstmt.setString(5, imei);
-            cstmt.setString(6, status);
-            
-            ResultSet rs = cstmt.executeQuery();
-            if (rs.next()) {
-                int newId = rs.getInt(1);
-                System.out.println("\n✓ Erfolg! Neues Gerät erfasst mit ID: " + newId);
-                System.out.println("Hersteller: " + hersteller);
-                System.out.println("Modell: " + modell);
-                System.out.println("Status: " + status);
-            }
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
-        }
-    }
-    
-    // ============================================================
-    // 2. sp_GerätEntfernen_Einfach
-    // ============================================================
-    private void call_sp_GerätEntfernen_Einfach() {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_GERÄTENTFERNEN_EINFACH - Gerät entfernen (Soft-Delete)");
-        System.out.println("=".repeat(60));
-        
-        System.out.print("Geräte-ID zum Entfernen: ");
-        String gerateIdStr = scanner.nextLine();
-        
-        System.out.print("Entfernungsgrund (optional): ");
-        String grund = scanner.nextLine();
         
         try {
-            int gerateId = Integer.parseInt(gerateIdStr);
+            CreateDeviceRequest request = new CreateDeviceRequest();
             
-            try (CallableStatement cstmt = connection.prepareCall("{call sp_GerätEntfernen_Einfach(?, ?)}")) {
-                cstmt.setInt(1, gerateId);
-                if (grund.isEmpty()) {
-                    cstmt.setNull(2, Types.NVARCHAR);
-                } else {
-                    cstmt.setString(2, grund);
-                }
-                
-                ResultSet rs = cstmt.executeQuery();
-                if (rs.next()) {
-                    System.out.println("\n✓ Erfolg: " + rs.getString("Meldung"));
-                    System.out.println("Entfernte Geräte-ID: " + rs.getInt("EntfernteGeräteID"));
-                }
+            System.out.print("Hersteller (z.B. Apple, Samsung, Dell): ");
+            request.setManufacturer(scanner.nextLine());
+            
+            System.out.print("Modell (z.B. iPhone 15, Galaxy S24, XPS 13): ");
+            request.setModel(scanner.nextLine());
+            
+            System.out.print("Betriebssystem (Windows, iOS, Android, macOS): ");
+            request.setOs(scanner.nextLine());
+            
+            System.out.print("OS Version (z.B. 17.2, 14, 23H2): ");
+            request.setOsVersion(scanner.nextLine());
+            
+            System.out.print("IMEI/Seriennummer: ");
+            request.setImei(scanner.nextLine());
+            
+            System.out.print("Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN) [LAGER]: ");
+            String status = scanner.nextLine();
+            if (!status.isEmpty()) {
+                request.setStatus(status.toUpperCase());
             }
+            
+            System.out.println("\nErfasse neues Gerät...");
+            DeviceResponse response = deviceService.createDevice(request);
+            
+            System.out.println("\n✓ Erfolg! Neues Gerät erfasst:");
+            System.out.println("  ID: " + response.getId());
+            System.out.println("  Gerät: " + response.getFullName());
+            System.out.println("  Betriebssystem: " + response.getOs() + " " + response.getOsVersion());
+            System.out.println("  Status: " + response.getStatus());
+            System.out.println("  IMEI: " + response.getImei());
+            if (response.getFormattedCreatedAt() != null) {
+                System.out.println("  Erstellt: " + response.getFormattedCreatedAt());
+            }
+            
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("\n✗ Allgemeiner Fehler: " + e.getMessage());
+        }
+    }
+    
+    // ============================================================
+    // 2. Gerät entfernen (Soft-Delete) (mit Service)
+    // ============================================================
+    private void removeDevice() {
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("GERÄT ENTFERNEN (SOFT-DELETE)");
+        System.out.println("=".repeat(60));
+        
+        try {
+            System.out.print("Geräte-ID zum Entfernen: ");
+            int deviceId = Integer.parseInt(scanner.nextLine());
+            
+            System.out.print("Entfernungsgrund (optional): ");
+            String reason = scanner.nextLine();
+            
+            System.out.println("\nEntferne Gerät...");
+            String result = deviceService.removeDevice(deviceId, reason);
+            
+            System.out.println("\n✓ " + result);
+            
         } catch (NumberFormatException e) {
             System.out.println("✗ Ungültige Geräte-ID!");
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("\n✗ Allgemeiner Fehler: " + e.getMessage());
         }
     }
     
     // ============================================================
-    // 3. sp_GerätAusgeben
+    // 3. Gerät an Mitarbeiter ausgeben (mit Service)
     // ============================================================
-    private void call_sp_GerätAusgeben() {
+    private void assignDeviceToEmployee() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_GERÄTAUSGEBEN - Gerät an Mitarbeiter ausgeben");
+        System.out.println("GERÄT AN MITARBEITER AUSGEBEN");
         System.out.println("=".repeat(60));
         
-        System.out.print("Geräte-ID: ");
-        String gerateIdStr = scanner.nextLine();
-        
-        System.out.print("Mitarbeiter-ID: ");
-        String mitarbeiterIdStr = scanner.nextLine();
-        
-        System.out.print("Ausgegeben von (z.B. IT-Admin, IT-Support): ");
-        String ausgegebenVon = scanner.nextLine();
-        
         try {
-            int gerateId = Integer.parseInt(gerateIdStr);
-            int mitarbeiterId = Integer.parseInt(mitarbeiterIdStr);
+            System.out.print("Geräte-ID: ");
+            int deviceId = Integer.parseInt(scanner.nextLine());
             
-            try (CallableStatement cstmt = connection.prepareCall("{call sp_GerätAusgeben(?, ?, ?)}")) {
-                cstmt.setInt(1, gerateId);
-                cstmt.setInt(2, mitarbeiterId);
-                cstmt.setString(3, ausgegebenVon);
-                
-                ResultSet rs = cstmt.executeQuery();
-                if (rs.next()) {
-                    System.out.println("\n✓ Erfolg: " + rs.getString("Meldung"));
-                }
-            }
+            System.out.print("Mitarbeiter-ID: ");
+            int employeeId = Integer.parseInt(scanner.nextLine());
+            
+            System.out.print("Ausgegeben von (z.B. IT-Admin, IT-Support): ");
+            String issuedBy = scanner.nextLine();
+            
+            System.out.println("\nGebe Gerät aus...");
+            String result = deviceService.assignDeviceToEmployee(deviceId, employeeId, issuedBy);
+            
+            System.out.println("\n✓ " + result);
+            
         } catch (NumberFormatException e) {
             System.out.println("✗ Ungültige ID!");
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
-            if (e.getErrorCode() == 50000) {
-                System.err.println("Das Gerät ist nicht verfügbar oder nicht im Lager.");
-            }
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("\n✗ Allgemeiner Fehler: " + e.getMessage());
         }
     }
     
     // ============================================================
-    // 4. sp_GerätZuruecknehmen
+    // 4. Gerät zurücknehmen (mit Service)
     // ============================================================
-    private void call_sp_GerätZuruecknehmen() {
+    private void returnDevice() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_GERÄTZURUECKNEHMEN - Gerät zurücknehmen");
+        System.out.println("GERÄT ZURÜCKNEHMEN");
         System.out.println("=".repeat(60));
         
-        System.out.print("Geräte-ID zur Rücknahme: ");
-        String gerateIdStr = scanner.nextLine();
-        
         try {
-            int gerateId = Integer.parseInt(gerateIdStr);
+            System.out.print("Geräte-ID zur Rücknahme: ");
+            int deviceId = Integer.parseInt(scanner.nextLine());
             
-            try (CallableStatement cstmt = connection.prepareCall("{call sp_GerätZuruecknehmen(?)}")) {
-                cstmt.setInt(1, gerateId);
-                
-                ResultSet rs = cstmt.executeQuery();
-                if (rs.next()) {
-                    System.out.println("\n✓ Erfolg: " + rs.getString("Meldung"));
-                }
-            }
+            System.out.println("\nNehme Gerät zurück...");
+            String result = deviceService.returnDevice(deviceId);
+            
+            System.out.println("\n✓ " + result);
+            
         } catch (NumberFormatException e) {
             System.out.println("✗ Ungültige Geräte-ID!");
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("\n✗ Allgemeiner Fehler: " + e.getMessage());
         }
     }
     
     // ============================================================
-    // 5. sp_GetMitarbeiterGeräte
+    // 5. Geräte eines Mitarbeiters anzeigen (über DB)
     // ============================================================
-    private void call_sp_GetMitarbeiterGeräte() {
+    private void getEmployeeDevices() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_GETMITARBEITERGERÄTE - Geräte eines Mitarbeiters");
+        System.out.println("GERÄTE EINES MITARBEITERS");
         System.out.println("=".repeat(60));
         
         System.out.print("Mitarbeiter-ID: ");
-        String mitarbeiterIdStr = scanner.nextLine();
+        String employeeIdStr = scanner.nextLine();
         
         try {
-            int mitarbeiterId = Integer.parseInt(mitarbeiterIdStr);
+            int employeeId = Integer.parseInt(employeeIdStr);
             
             try (CallableStatement cstmt = connection.prepareCall("{call sp_GetMitarbeiterGeräte(?)}")) {
-                cstmt.setInt(1, mitarbeiterId);
+                cstmt.setInt(1, employeeId);
                 
                 ResultSet rs = cstmt.executeQuery();
                 
-                System.out.println("\nGeräte von Mitarbeiter ID " + mitarbeiterId + ":");
+                System.out.println("\nGeräte von Mitarbeiter ID " + employeeId + ":");
                 System.out.printf("\n%-25s %-15s %-20s %-15s %-15s%n", 
                     "Gerät", "Status", "OS Version", "Ausgabedatum", "Tage im Einsatz");
                 System.out.println("-".repeat(90));
@@ -324,39 +307,32 @@ public class MenuManager {
     }
     
     // ============================================================
-    // 6. sp_GetVerfügbareGeräte
+    // 6. Verfügbare Geräte im Lager anzeigen (mit Service)
     // ============================================================
-    private void call_sp_GetVerfügbareGeräte() {
+    private void getAvailableDevices() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_GETVERFÜGBAREGERÄTE - Verfügbare Geräte im Lager");
+        System.out.println("VERFÜGBARE GERÄTE IM LAGER");
         System.out.println("=".repeat(60));
         
         System.out.print("Gerätetyp-Filter (z.B. iPhone, Galaxy, leer für alle): ");
         String filter = scanner.nextLine();
         
-        try (CallableStatement cstmt = connection.prepareCall("{call sp_GetVerfügbareGeräte(?)}")) {
-            if (filter.isEmpty()) {
-                cstmt.setNull(1, Types.NVARCHAR);
-            } else {
-                cstmt.setString(1, filter);
-            }
-            
-            ResultSet rs = cstmt.executeQuery();
+        try {
+            List<DeviceResponse> devices = deviceService.getAvailableDevices(filter);
             
             System.out.println("\nVerfügbare Geräte im Lager" + 
                 (filter.isEmpty() ? "" : " (Filter: " + filter + ")") + ":");
-            System.out.printf("\n%-5s %-25s %-25s %-15s %-20s%n", 
-                "ID", "Gerät", "Betriebssystem", "Lagerdauer", "Im Lager seit");
-            System.out.println("-".repeat(90));
+            System.out.printf("\n%-5s %-25s %-20s %-15s%n", 
+                "ID", "Gerät", "Betriebssystem", "Status");
+            System.out.println("-".repeat(65));
             
             int count = 0;
-            while (rs.next()) {
-                System.out.printf("%-5d %-25s %-25s %-15d %-20s%n",
-                    rs.getInt("id"),
-                    rs.getString("Gerät"),
-                    rs.getString("Betriebssystem"),
-                    rs.getInt("Lagerdauer_Tage"),
-                    rs.getDate("Im_Lager_seit"));
+            for (DeviceResponse device : devices) {
+                System.out.printf("%-5d %-25s %-20s %-15s%n",
+                    device.getId(),
+                    device.getFullName(),
+                    device.getOs() + " " + device.getOsVersion(),
+                    device.getStatus());
                 count++;
             }
             
@@ -365,17 +341,17 @@ public class MenuManager {
             } else {
                 System.out.println("\nGesamt: " + count + " verfügbare Gerät(e)");
             }
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
         }
     }
     
     // ============================================================
-    // 7. sp_Monatsreport
+    // 7. Monatlichen Kostenreport generieren (über DB)
     // ============================================================
-    private void call_sp_Monatsreport() {
+    private void generateMonthlyReport() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_MONATSREPORT - Monatlicher Kostenreport");
+        System.out.println("MONATLICHER KOSTENREPORT");
         System.out.println("=".repeat(60));
         
         System.out.print("Monat (1-12, leer für aktuellen Monat): ");
@@ -447,11 +423,11 @@ public class MenuManager {
     }
     
     // ============================================================
-    // 8. sp_DemoComplianceCheck
+    // 8. Compliance-Check für Richtlinie (über DB)
     // ============================================================
-    private void call_sp_DemoComplianceCheck() {
+    private void performComplianceCheck() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_DEMOCOMPLIANCECHECK - Compliance-Check für Richtlinie");
+        System.out.println("COMPLIANCE-CHECK FÜR RICHTLINIE");
         System.out.println("=".repeat(60));
         
         System.out.println("\nVerfügbare Richtlinien:");
@@ -510,65 +486,12 @@ public class MenuManager {
         }
     }
     
-    private void showComplianceDetails(int policyId) throws SQLException {
-        System.out.println("\nDetails der Compliance-Prüfungen:");
-        
-        String sql = "SELECT TOP 10 cp.*, e.hersteller + ' ' + e.modell as Gerät, r.name as Richtlinie " +
-                    "FROM CompliancePruefung cp " +
-                    "JOIN Endgeraet e ON cp.endgeraetId = e.id " +
-                    "JOIN Richtlinie r ON cp.policyId = r.id " +
-                    "WHERE cp.policyId = ? " +
-                    "ORDER BY cp.geprueftAm DESC";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, policyId);
-            ResultSet rs = pstmt.executeQuery();
-            
-            System.out.printf("\n%-5s %-25s %-10s %-15s %-50s%n", 
-                "GerätID", "Gerät", "Erfüllt", "Geprüft am", "Bemerkung");
-            System.out.println("-".repeat(105));
-            
-            int count = 0;
-            while (rs.next()) {
-                String erfuellt = rs.getBoolean("erfuellt") ? "✓" : "✗";
-                String bemerkung = rs.getString("bemerkung");
-                if (bemerkung.length() > 50) {
-                    bemerkung = bemerkung.substring(0, 47) + "...";
-                }
-                
-                System.out.printf("%-5d %-25s %-10s %-15s %-50s%n",
-                    rs.getInt("endgeraetId"),
-                    rs.getString("Gerät"),
-                    erfuellt,
-                    rs.getDate("geprueftAm"),
-                    bemerkung);
-                count++;
-            }
-            
-            System.out.println("\nAngezeigt: " + count + " von " + getTotalComplianceChecks(policyId) + " Prüfungen");
-        }
-    }
-    
-    private int getTotalComplianceChecks(int policyId) throws SQLException {
-        String sql = "SELECT COUNT(*) as total FROM CompliancePruefung WHERE policyId = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, policyId);
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                return rs.getInt("total");
-            }
-        }
-        return 0;
-    }
-    
     // ============================================================
-    // 9. sp_AlleComplianceChecks
+    // 9. Alle Compliance-Checks durchführen (über DB)
     // ============================================================
-    private void call_sp_AlleComplianceChecks() {
+    private void performAllComplianceChecks() {
         System.out.println("\n" + "=".repeat(60));
-        System.out.println("SP_ALLECOMPLIANCECHECKS - Alle Compliance-Checks durchführen");
+        System.out.println("ALLE COMPLIANCE-CHECKS DURCHFÜHREN");
         System.out.println("=".repeat(60));
         
         System.out.println("\nStarte umfassenden Compliance-Check für alle Richtlinien...");
@@ -627,7 +550,7 @@ public class MenuManager {
     }
     
     // ============================================================
-    // 10. Views anzeigen
+    // 10. Views anzeigen (über DB)
     // ============================================================
     private void showAllViews() {
         System.out.println("\n" + "=".repeat(60));
@@ -667,6 +590,449 @@ public class MenuManager {
             default:
                 System.out.println("Ungültige Auswahl.");
         }
+    }
+    
+    // ============================================================
+    // 11. Tabellen anzeigen (über DB)
+    // ============================================================
+    private void showAllTables() {
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("ALLE TABELLEN IN DER DATENBANK");
+        System.out.println("=".repeat(60));
+        
+        String sql = "SELECT TABLE_NAME " +
+                    "FROM INFORMATION_SCHEMA.TABLES " +
+                    "WHERE TABLE_SCHEMA = 'dbo' " +
+                    "AND TABLE_TYPE = 'BASE TABLE' " +
+                    "ORDER BY TABLE_NAME";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            System.out.printf("\n%-35s %-15s%n", "Tabelle", "Typ");
+            System.out.println("-".repeat(50));
+            
+            int tableCount = 0;
+            
+            while (rs.next()) {
+                String tableName = rs.getString("TABLE_NAME");
+                System.out.printf("%-35s %-15s%n", tableName, "BASE TABLE");
+                tableCount++;
+            }
+            
+            System.out.println("\n" + "=".repeat(50));
+            System.out.println("STATISTIK:");
+            System.out.println("Anzahl Tabellen: " + tableCount);
+            System.out.println("=".repeat(50));
+            
+        } catch (SQLException e) {
+            System.err.println("✗ Fehler beim Abrufen der Tabellen: " + e.getMessage());
+        }
+    }
+    
+	 // ============================================================
+	 // 12. AUDITLOG anzeigen (über DB) - KORRIGIERTE VERSION
+	 // ============================================================
+	 private void showAuditLog() {
+	     System.out.println("\n" + "=".repeat(80));
+	     System.out.println("AUDITLOG - ÄNDERUNGSPROTOKOLL");
+	     System.out.println("=".repeat(80));
+	     
+	     System.out.println("\nFilteroptionen:");
+	     System.out.println("1. Alle Einträge anzeigen");
+	     System.out.println("2. Nur Statusänderungen von Endgeräten");
+	     System.out.println("3. Letzte 24 Stunden");
+	     System.out.println("4. Nach Datum filtern");
+	     System.out.println("5. Nach Benutzer filtern");
+	     System.out.print("\nWähle Filter (1-5): ");
+	     
+	     String filterChoice = scanner.nextLine();
+	     
+	     String sql = "SELECT * FROM AuditLog WHERE 1=1";
+	     
+	     switch (filterChoice) {
+	         case "1":
+	             break;
+	         case "2":
+	             sql += " AND tabelle = 'Endgeraet' AND aktion = 'Statusänderung'";
+	             break;
+	         case "3":
+	             sql += " AND zeitpunkt >= DATEADD(HOUR, -24, GETDATE())";
+	             break;
+	         case "4":
+	             System.out.print("Startdatum (YYYY-MM-DD): ");
+	             String startDate = scanner.nextLine();
+	             System.out.print("Enddatum (YYYY-MM-DD, optional): ");
+	             String endDate = scanner.nextLine();
+	             
+	             if (!startDate.isEmpty()) {
+	                 sql += " AND CONVERT(DATE, zeitpunkt) >= '" + startDate + "'";
+	             }
+	             if (!endDate.isEmpty()) {
+	                 sql += " AND CONVERT(DATE, zeitpunkt) <= '" + endDate + "'";
+	             }
+	             break;
+	         case "5":
+	             System.out.print("Benutzername (oder Teil): ");
+	             String user = scanner.nextLine();
+	             if (!user.isEmpty()) {
+	                 sql += " AND benutzer LIKE '%" + user + "%'";
+	             }
+	             break;
+	         default:
+	             System.out.println("Ungültige Auswahl, zeige alle Einträge.");
+	     }
+	     
+	     sql += " ORDER BY zeitpunkt DESC";
+	     
+	     System.out.print("\nAnzahl der Einträge (0 für alle): ");
+	     String limitStr = scanner.nextLine();
+	     int limit = 0;
+	     try {
+	         limit = Integer.parseInt(limitStr);
+	         if (limit > 0) {
+	             sql += " OFFSET 0 ROWS FETCH NEXT " + limit + " ROWS ONLY";
+	         }
+	     } catch (NumberFormatException e) {
+	     }
+	     
+	     System.out.println("\n" + "=".repeat(140));
+	     System.out.println("AUDITLOG EINTRÄGE");
+	     System.out.println("=".repeat(140));
+	     
+	     try (Statement stmt = connection.createStatement();
+	          ResultSet rs = stmt.executeQuery(sql)) {
+	         
+	         // KORRIGIERT: Gerät-ID Spalte hinzugefügt
+	         System.out.printf("\n%-5s %-15s %-20s %-25s %-25s %-20s %-15s %-10s%n", 
+	             "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt", "Benutzer", "Gerät-ID");
+	         System.out.println("-".repeat(140));
+	         
+	         int count = 0;
+	         while (rs.next()) {
+	             String alt = rs.getString("alt");
+	             String neu = rs.getString("neu");
+	             
+	             if (alt != null && alt.length() > 20) alt = alt.substring(0, 17) + "...";
+	             if (neu != null && neu.length() > 20) neu = neu.substring(0, 17) + "...";
+	             
+	             // KORRIGIERT: endgeraet_id auslesen und anzeigen
+	             Integer deviceId = null;
+	             try {
+	                 Object deviceIdObj = rs.getObject("endgeraet_id");
+	                 if (deviceIdObj != null) {
+	                     deviceId = rs.getInt("endgeraet_id");
+	                 }
+	             } catch (SQLException e) {
+	                 // Spalte existiert nicht oder ist NULL
+	             }
+	             
+	             System.out.printf("%-5d %-15s %-20s %-25s %-25s %-20s %-15s %-10s%n",
+	                 rs.getInt("id"),
+	                 rs.getString("tabelle"),
+	                 rs.getString("aktion"),
+	                 (alt != null ? alt : "NULL"),
+	                 (neu != null ? neu : "NULL"),
+	                 rs.getTimestamp("zeitpunkt"),
+	                 rs.getString("benutzer"),
+	                 (deviceId != null ? deviceId.toString() : "-"));
+	             count++;
+	         }
+	         
+	         System.out.println("\n" + "=".repeat(60));
+	         System.out.println("GESAMT: " + count + " AuditLog-Einträge");
+	         System.out.println("=".repeat(60));
+	         
+	         showAuditLogStatistics();
+	         
+	     } catch (SQLException e) {
+	         System.err.println("✗ Fehler beim Abrufen des AuditLogs: " + e.getMessage());
+	         checkAuditLogTable();
+	     }
+	 }
+    
+    // ============================================================
+    // 13. AUDITLOG TEST - Trigger testen (mit Service)
+    // ============================================================
+    private void testAuditLogTrigger() {
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("AUDITLOG TRIGGER TEST");
+        System.out.println("=".repeat(80));
+        
+        System.out.println("\nDies testet den Trigger trg_GeräteStatusChange.");
+        System.out.println("Es wird ein Gerätestatus geändert, was einen AuditLog-Eintrag erzeugen sollte.");
+        
+        System.out.println("\nSuche ein geeignetes Testgerät...");
+        
+        String findSql = 
+            "SELECT TOP 3 id, hersteller, modell, status " +
+            "FROM Endgeraet " +
+            "WHERE status IN ('LAGER', 'AKTIV') " +
+            "ORDER BY id";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(findSql)) {
+            
+            System.out.println("\nVerfügbare Testgeräte:");
+            System.out.printf("%-5s %-15s %-15s %-10s%n", "ID", "Hersteller", "Modell", "Status");
+            System.out.println("-".repeat(45));
+            
+            while (rs.next()) {
+                System.out.printf("%-5d %-15s %-15s %-10s%n",
+                    rs.getInt("id"),
+                    rs.getString("hersteller"),
+                    rs.getString("modell"),
+                    rs.getString("status"));
+            }
+        } catch (SQLException e) {
+            System.err.println("✗ Fehler beim Suchen von Geräten: " + e.getMessage());
+            return;
+        }
+        
+        System.out.print("\nGeräte-ID für Test: ");
+        String deviceIdStr = scanner.nextLine();
+        
+        System.out.print("Neuer Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN): ");
+        String newStatus = scanner.nextLine().toUpperCase();
+        
+        if (!isValidStatus(newStatus)) {
+            System.out.println("✗ Ungültiger Status! Erlaubt: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
+            return;
+        }
+        
+        try {
+            int deviceId = Integer.parseInt(deviceIdStr);
+            
+            // Hole aktuellen Status über Service
+            DeviceResponse device = deviceService.getDeviceById(deviceId);
+            String currentStatus = device.getStatus();
+            
+            System.out.println("\n=== TEST VORBEREITUNG ===");
+            System.out.println("Gerät ID: " + deviceId);
+            System.out.println("Aktueller Status: " + currentStatus);
+            System.out.println("Neuer Status: " + newStatus);
+            
+            if (currentStatus.equals(newStatus)) {
+                System.out.println("\n⚠️  Status ist bereits " + newStatus + ". Wähle einen anderen Status.");
+                return;
+            }
+            
+            int auditCountBefore = getAuditLogCount();
+            System.out.println("AuditLog-Einträge vorher: " + auditCountBefore);
+            
+            System.out.println("\n=== FÜHRE STATUSÄNDERUNG DURCH ===");
+            
+            // Status über Service ändern
+            DeviceResponse updatedDevice = deviceService.updateDeviceStatus(deviceId, newStatus);
+            
+            System.out.println("Status erfolgreich geändert zu: " + updatedDevice.getStatus());
+            
+            // Warten für Trigger
+            Thread.sleep(1000);
+            
+            int auditCountAfter = getAuditLogCount();
+            System.out.println("AuditLog-Einträge nachher: " + auditCountAfter);
+            
+            int newEntries = auditCountAfter - auditCountBefore;
+            System.out.println("Neue AuditLog-Einträge: " + newEntries);
+            
+            if (newEntries > 0) {
+                System.out.println("\n✓ ERFOLG: Trigger wurde ausgelöst!");
+                
+                System.out.println("\n=== NEUE AUDITLOG-EINTRÄGE ===");
+                
+                String newAuditSql = 
+                    "SELECT * FROM (" +
+                    "    SELECT *, ROW_NUMBER() OVER (ORDER BY id DESC) as rn " +
+                    "    FROM AuditLog " +
+                    ") as numbered " +
+                    "WHERE rn <= ? " +
+                    "ORDER BY id DESC";
+                
+                try (PreparedStatement pstmt2 = connection.prepareStatement(newAuditSql)) {
+                    pstmt2.setInt(1, newEntries);
+                    
+                    try (ResultSet rs = pstmt2.executeQuery()) {
+                        System.out.printf("\n%-5s %-15s %-20s %-15s %-15s %-20s%n", 
+                            "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt");
+                        System.out.println("-".repeat(90));
+                        
+                        while (rs.next()) {
+                            System.out.printf("%-5d %-15s %-20s %-15s %-15s %-20s%n",
+                                rs.getInt("id"),
+                                rs.getString("tabelle"),
+                                rs.getString("aktion"),
+                                rs.getString("alt"),
+                                rs.getString("neu"),
+                                rs.getTimestamp("zeitpunkt"));
+                        }
+                    }
+                }
+                
+                System.out.print("\nStatus zurücksetzen auf '" + currentStatus + "'? (j/n): ");
+                String resetChoice = scanner.nextLine().toLowerCase();
+                
+                if (resetChoice.equals("j") || resetChoice.equals("ja")) {
+                    deviceService.updateDeviceStatus(deviceId, currentStatus);
+                    System.out.println("✓ Status zurückgesetzt auf: " + currentStatus);
+                }
+                
+            } else {
+                System.out.println("\n✗ FEHLER: Keine neuen AuditLog-Einträge erstellt!");
+                System.out.println("Mögliche Ursachen:");
+                System.out.println("1. Trigger ist nicht aktiv oder fehlerhaft");
+                System.out.println("2. AuditLog-Tabelle existiert nicht");
+                System.out.println("3. Benutzer hat keine INSERT-Rechte auf AuditLog");
+            }
+            
+        } catch (NumberFormatException e) {
+            System.out.println("✗ Ungültige Geräte-ID!");
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        } catch (SQLException e) {
+            System.err.println("✗ SQL Fehler: " + e.getMessage());
+        } catch (InterruptedException e) {
+            System.err.println("✗ Sleep unterbrochen: " + e.getMessage());
+        }
+    }
+    
+    // ============================================================
+    // 14. Datenbank-Informationen (über DB)
+    // ============================================================
+    private void showDatabaseInfo() {
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("DATENBANK-INFORMATIONEN");
+        System.out.println("=".repeat(60));
+        
+        try {
+            var meta = connection.getMetaData();
+            
+            System.out.println("\n=== Verbindungsinformationen ===");
+            System.out.println("Datenbank: " + meta.getDatabaseProductName() 
+                             + " " + meta.getDatabaseProductVersion());
+            System.out.println("JDBC-Treiber: " + meta.getDriverName() 
+                             + " " + meta.getDriverVersion());
+            System.out.println("URL: " + meta.getURL());
+            System.out.println("Benutzer: " + meta.getUserName());
+            
+            System.out.println("\n=== Datenbank-Statistiken ===");
+            
+            showTablesInfo();
+            showViewsInfo();
+            showStoredProceduresInfo();
+            
+        } catch (SQLException e) {
+            System.err.println("✗ Fehler: " + e.getMessage());
+        }
+    }
+    
+    // ============================================================
+    // 15. Gerätestatistiken (mit Service)
+    // ============================================================
+    private void showDeviceStatistics() {
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("GERÄTESTATISTIKEN");
+        System.out.println("=".repeat(60));
+        
+        try {
+            int totalDevices = deviceService.getDeviceCount();
+            int availableDevices = deviceService.getDeviceCountByStatus("LAGER");
+            int activeDevices = deviceService.getDeviceCountByStatus("AKTIV");
+            int defectiveDevices = deviceService.getDeviceCountByStatus("DEFEKT");
+            int retiredDevices = deviceService.getDeviceCountByStatus("AUSGESCHIEDEN");
+            
+            System.out.println("\n=== ÜBERSICHT ===");
+            System.out.println("Gesamte Geräte: " + totalDevices);
+            System.out.println("Verfügbar (LAGER): " + availableDevices);
+            System.out.println("Aktiv (AKTIV): " + activeDevices);
+            System.out.println("Defekt (DEFEKT): " + defectiveDevices);
+            System.out.println("Ausgeschieden (AUSGESCHIEDEN): " + retiredDevices);
+            
+            if (totalDevices > 0) {
+                System.out.println("\n=== PROZENTUAL ===");
+                System.out.printf("Verfügbar: %.1f%%%n", (availableDevices * 100.0 / totalDevices));
+                System.out.printf("Aktiv: %.1f%%%n", (activeDevices * 100.0 / totalDevices));
+                System.out.printf("Defekt: %.1f%%%n", (defectiveDevices * 100.0 / totalDevices));
+                System.out.printf("Ausgeschieden: %.1f%%%n", (retiredDevices * 100.0 / totalDevices));
+            }
+            
+            System.out.println("\n=== VERFÜGBARKEITSCHECK ===");
+            System.out.print("Geräte-ID prüfen (oder leer lassen): ");
+            String checkId = scanner.nextLine();
+            
+            if (!checkId.isEmpty()) {
+                try {
+                    int deviceId = Integer.parseInt(checkId);
+                    boolean isAvailable = deviceService.isDeviceAvailable(deviceId);
+                    System.out.println("Gerät " + deviceId + " ist verfügbar: " + 
+                                      (isAvailable ? "✓ JA" : "✗ NEIN"));
+                } catch (NumberFormatException e) {
+                    System.out.println("Ungültige Geräte-ID");
+                } catch (EMMException e) {
+                    System.err.println("✗ Fehler: " + e.getMessage());
+                }
+            }
+            
+        } catch (EMMException e) {
+            System.err.println("\n✗ Fehler [" + e.getErrorCode() + "]: " + e.getMessage());
+        }
+    }
+    
+    // ============================================================
+    // Hilfsmethoden
+    // ============================================================
+    
+    private void showComplianceDetails(int policyId) throws SQLException {
+        System.out.println("\nDetails der Compliance-Prüfungen:");
+        
+        String sql = "SELECT TOP 10 cp.*, e.hersteller + ' ' + e.modell as Gerät, r.name as Richtlinie " +
+                    "FROM CompliancePruefung cp " +
+                    "JOIN Endgeraet e ON cp.endgeraetId = e.id " +
+                    "JOIN Richtlinie r ON cp.policyId = r.id " +
+                    "WHERE cp.policyId = ? " +
+                    "ORDER BY cp.geprueftAm DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, policyId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            System.out.printf("\n%-5s %-25s %-10s %-15s %-50s%n", 
+                "GerätID", "Gerät", "Erfüllt", "Geprüft am", "Bemerkung");
+            System.out.println("-".repeat(105));
+            
+            int count = 0;
+            while (rs.next()) {
+                String erfuellt = rs.getBoolean("erfuellt") ? "✓" : "✗";
+                String bemerkung = rs.getString("bemerkung");
+                if (bemerkung.length() > 50) {
+                    bemerkung = bemerkung.substring(0, 47) + "...";
+                }
+                
+                System.out.printf("%-5d %-25s %-10s %-15s %-50s%n",
+                    rs.getInt("endgeraetId"),
+                    rs.getString("Gerät"),
+                    erfuellt,
+                    rs.getDate("geprueftAm"),
+                    bemerkung);
+                count++;
+            }
+            
+            System.out.println("\nAngezeigt: " + count + " von " + getTotalComplianceChecks(policyId) + " Prüfungen");
+        }
+    }
+    
+    private int getTotalComplianceChecks(int policyId) throws SQLException {
+        String sql = "SELECT COUNT(*) as total FROM CompliancePruefung WHERE policyId = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, policyId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt("total");
+            }
+        }
+        return 0;
     }
     
     private void showAllViewsList() {
@@ -743,203 +1109,6 @@ public class MenuManager {
         }
     }
     
-    // ============================================================
-    // 11. Tabellen anzeigen
-    // ============================================================
-    private void showAllTables() {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("ALLE TABELLEN IN DER DATENBANK");
-        System.out.println("=".repeat(60));
-        
-        String sql = "SELECT TABLE_NAME " +
-                    "FROM INFORMATION_SCHEMA.TABLES " +
-                    "WHERE TABLE_SCHEMA = 'dbo' " +
-                    "AND TABLE_TYPE = 'BASE TABLE' " +
-                    "ORDER BY TABLE_NAME";
-        
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
-            System.out.printf("\n%-35s %-15s%n", "Tabelle", "Typ");
-            System.out.println("-".repeat(50));
-            
-            int tableCount = 0;
-            
-            while (rs.next()) {
-                String tableName = rs.getString("TABLE_NAME");
-                System.out.printf("%-35s %-15s%n", tableName, "BASE TABLE");
-                tableCount++;
-            }
-            
-            System.out.println("\n" + "=".repeat(50));
-            System.out.println("STATISTIK:");
-            System.out.println("Anzahl Tabellen: " + tableCount);
-            System.out.println("=".repeat(50));
-            
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler beim Abrufen der Tabellen: " + e.getMessage());
-        }
-    }
-    
-    // ============================================================
-    // 12. AUDITLOG anzeigen
-    // ============================================================
- // In MenuManager.java - Anpassung der showAuditLog Methode
-
- // In MenuManager.java - Korrektur der showAuditLog Methode
-
-    private void showAuditLog() {
-        System.out.println("\n" + "=".repeat(80));
-        System.out.println("AUDITLOG - ÄNDERUNGSPROTOKOLL");
-        System.out.println("=".repeat(80));
-        
-        System.out.println("\nFilteroptionen:");
-        System.out.println("1. Alle Einträge anzeigen");
-        System.out.println("2. Nur Statusänderungen von Endgeräten");
-        System.out.println("3. Letzte 24 Stunden");
-        System.out.println("4. Nach Datum filtern");
-        System.out.println("5. Nach Benutzer filtern");
-        System.out.println("6. Nach Gerät filtern");
-        System.out.print("\nWähle Filter (1-6): ");
-        
-        String filterChoice = scanner.nextLine();
-        
-        Integer deviceId = null;
-        List<de.emm.demo.model.AuditLogEntry> entries = new ArrayList<>();
-        
-        try {
-            switch (filterChoice) {
-                case "1":
-                    entries = auditRepo.getAllAuditLogsWithDevices();
-                    break;
-                case "2":
-                    entries = auditRepo.getDeviceStatusChanges();
-                    enrichWithDeviceInfo(entries);
-                    break;
-                case "3":
-                    entries = auditRepo.getAuditLogsLast24Hours();
-                    break;
-                case "4":
-                    System.out.print("Startdatum (YYYY-MM-DD): ");
-                    String startDate = scanner.nextLine();
-                    System.out.print("Enddatum (YYYY-MM-DD, optional): ");
-                    String endDate = scanner.nextLine();
-                    
-                    java.util.Date start = null;
-                    java.util.Date end = null;
-                    
-                    if (!startDate.isEmpty()) {
-                        start = java.sql.Date.valueOf(startDate);
-                    }
-                    if (!endDate.isEmpty()) {
-                        end = java.sql.Date.valueOf(endDate);
-                    }
-                    
-                    entries = auditRepo.getAuditLogsByFilter(null, null, start, end, null, "zeitpunkt DESC");
-                    enrichWithDeviceInfo(entries);
-                    break;
-                case "5":
-                    System.out.print("Benutzername (oder Teil): ");
-                    String user = scanner.nextLine();
-                    if (!user.isEmpty()) {
-                        entries = auditRepo.getAuditLogsForUser(user);
-                        enrichWithDeviceInfo(entries);
-                    }
-                    break;
-                case "6":
-                    System.out.print("Geräte-ID (oder leer für alle): ");
-                    String deviceIdStr = scanner.nextLine();
-                    if (!deviceIdStr.isEmpty()) {
-                        try {
-                            deviceId = Integer.parseInt(deviceIdStr);
-                            entries = auditRepo.getAuditLogsForDevice(deviceId);
-                        } catch (NumberFormatException e) {
-                            System.out.println("✗ Ungültige Geräte-ID!");
-                            return;
-                        }
-                    } else {
-                        entries = auditRepo.getAllAuditLogsWithDevices();
-                    }
-                    break;
-                default:
-                    System.out.println("Ungültige Auswahl, zeige alle Einträge.");
-                    entries = auditRepo.getAllAuditLogsWithDevices();
-            }
-            
-            System.out.println("\n" + "=".repeat(140));
-            System.out.println("AUDITLOG EINTRÄGE");
-            System.out.println("=".repeat(140));
-            
-            System.out.printf("\n%-5s %-15s %-20s %-25s %-25s %-20s %-15s %-25s%n", 
-                "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt", "Benutzer", "Gerät");
-            System.out.println("-".repeat(140));
-            
-            int count = 0;
-            for (de.emm.demo.model.AuditLogEntry entry : entries) {
-                String alt = entry.getOldValue();
-                String neu = entry.getNewValue();
-                
-                if (alt != null && alt.length() > 20) alt = alt.substring(0, 17) + "...";
-                if (neu != null && neu.length() > 20) neu = neu.substring(0, 17) + "...";
-                
-                String deviceInfo = "";
-                if (entry.getDeviceId() != null) {
-                    deviceInfo = "ID:" + entry.getDeviceId();
-                    if (entry.getDevice() != null) {
-                        deviceInfo += " " + entry.getDevice().getManufacturer() + 
-                                     " " + entry.getDevice().getModel();
-                    }
-                }
-                
-                System.out.printf("%-5d %-15s %-20s %-25s %-25s %-20s %-15s %-25s%n",
-                    entry.getId(),
-                    entry.getTable(),
-                    entry.getAction(),
-                    (alt != null ? alt : "NULL"),
-                    (neu != null ? neu : "NULL"),
-                    entry.getTimestamp(),
-                    entry.getUser(),
-                    deviceInfo);
-                count++;
-            }
-            
-            System.out.println("\n" + "=".repeat(60));
-            System.out.println("GESAMT: " + count + " AuditLog-Einträge");
-            System.out.println("=".repeat(60));
-            
-            // Zeige Statistik
-            showAuditLogStatistics();
-            
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler beim Abrufen des AuditLogs: " + e.getMessage());
-            checkAuditLogTable();
-        } catch (Exception e) {
-            System.err.println("✗ Allgemeiner Fehler: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Hilfsmethode um Geräteinformationen zu laden
-     */
-    private void enrichWithDeviceInfo(List<de.emm.demo.model.AuditLogEntry> entries) {
-        try {
-            // Diese Methode wird im Repository bereits aufgerufen,
-            // aber für den Fall der Fälle hier auch
-            for (de.emm.demo.model.AuditLogEntry entry : entries) {
-                if (entry.getDeviceId() != null && entry.getDevice() == null) {
-                    try {
-                        de.emm.demo.model.Device device = deviceRepo.getDeviceById(entry.getDeviceId());
-                        entry.setDevice(device);
-                    } catch (SQLException e) {
-                        // Ignorieren, falls Gerät nicht gefunden
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Fehler ignorieren
-        }
-    }
-    
     private void showAuditLogStatistics() throws SQLException {
         System.out.println("\n" + "-".repeat(60));
         System.out.println("AUDITLOG STATISTIK");
@@ -986,193 +1155,6 @@ public class MenuManager {
                     System.out.println("Das AuditLog ist leer.");
                 }
             }
-        }
-    }
-    
-    // ============================================================
-    // 13. AUDITLOG TEST - Trigger testen
-    // ============================================================
-    private void testAuditLogTrigger() {
-        System.out.println("\n" + "=".repeat(80));
-        System.out.println("AUDITLOG TRIGGER TEST");
-        System.out.println("=".repeat(80));
-        
-        System.out.println("\nDies testet den Trigger trg_GeräteStatusChange.");
-        System.out.println("Es wird ein Gerätestatus geändert, was einen AuditLog-Eintrag erzeugen sollte.");
-        
-        System.out.println("\nSuche ein geeignetes Testgerät...");
-        
-        String findSql = 
-            "SELECT TOP 3 id, hersteller, modell, status " +
-            "FROM Endgeraet " +
-            "WHERE status IN ('LAGER', 'AKTIV') " +
-            "ORDER BY id";
-        
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(findSql)) {
-            
-            System.out.println("\nVerfügbare Testgeräte:");
-            System.out.printf("%-5s %-15s %-15s %-10s%n", "ID", "Hersteller", "Modell", "Status");
-            System.out.println("-".repeat(45));
-            
-            while (rs.next()) {
-                System.out.printf("%-5d %-15s %-15s %-10s%n",
-                    rs.getInt("id"),
-                    rs.getString("hersteller"),
-                    rs.getString("modell"),
-                    rs.getString("status"));
-            }
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler beim Suchen von Geräten: " + e.getMessage());
-            return;
-        }
-        
-        System.out.print("\nGeräte-ID für Test: ");
-        String deviceIdStr = scanner.nextLine();
-        
-        System.out.print("Neuer Status (LAGER/AKTIV/DEFEKT/AUSGESCHIEDEN): ");
-        String newStatus = scanner.nextLine().toUpperCase();
-        
-        if (!isValidStatus(newStatus)) {
-            System.out.println("✗ Ungültiger Status! Erlaubt: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
-            return;
-        }
-        
-        try {
-            int deviceId = Integer.parseInt(deviceIdStr);
-            
-            String currentStatus = getDeviceStatus(deviceId);
-            if (currentStatus == null) {
-                System.out.println("✗ Gerät mit ID " + deviceId + " nicht gefunden.");
-                return;
-            }
-            
-            System.out.println("\n=== TEST VORBEREITUNG ===");
-            System.out.println("Gerät ID: " + deviceId);
-            System.out.println("Aktueller Status: " + currentStatus);
-            System.out.println("Neuer Status: " + newStatus);
-            
-            if (currentStatus.equals(newStatus)) {
-                System.out.println("\n⚠️  Status ist bereits " + newStatus + ". Wähle einen anderen Status.");
-                return;
-            }
-            
-            int auditCountBefore = getAuditLogCount();
-            System.out.println("AuditLog-Einträge vorher: " + auditCountBefore);
-            
-            System.out.println("\n=== FÜHRE STATUSÄNDERUNG DURCH ===");
-            
-            String updateSql = "UPDATE Endgeraet SET status = ? WHERE id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(updateSql)) {
-                pstmt.setString(1, newStatus);
-                pstmt.setInt(2, deviceId);
-                
-                int rowsAffected = pstmt.executeUpdate();
-                System.out.println("UPDATE ausgeführt. Betroffene Zeilen: " + rowsAffected);
-                
-                if (rowsAffected > 0) {
-                    Thread.sleep(1000);
-                    
-                    int auditCountAfter = getAuditLogCount();
-                    System.out.println("AuditLog-Einträge nachher: " + auditCountAfter);
-                    
-                    int newEntries = auditCountAfter - auditCountBefore;
-                    System.out.println("Neue AuditLog-Einträge: " + newEntries);
-                    
-                    if (newEntries > 0) {
-                        System.out.println("\n✓ ERFOLG: Trigger wurde ausgelöst!");
-                        
-                        System.out.println("\n=== NEUE AUDITLOG-EINTRÄGE ===");
-                        
-                        String newAuditSql = 
-                            "SELECT * FROM (" +
-                            "    SELECT *, ROW_NUMBER() OVER (ORDER BY id DESC) as rn " +
-                            "    FROM AuditLog " +
-                            ") as numbered " +
-                            "WHERE rn <= ? " +
-                            "ORDER BY id DESC";
-                        
-                        try (PreparedStatement pstmt2 = connection.prepareStatement(newAuditSql)) {
-                            pstmt2.setInt(1, newEntries);
-                            
-                            try (ResultSet rs = pstmt2.executeQuery()) {
-                                System.out.printf("\n%-5s %-15s %-20s %-15s %-15s %-20s%n", 
-                                    "ID", "Tabelle", "Aktion", "Alt", "Neu", "Zeitpunkt");
-                                System.out.println("-".repeat(90));
-                                
-                                while (rs.next()) {
-                                    System.out.printf("%-5d %-15s %-20s %-15s %-15s %-20s%n",
-                                        rs.getInt("id"),
-                                        rs.getString("tabelle"),
-                                        rs.getString("aktion"),
-                                        rs.getString("alt"),
-                                        rs.getString("neu"),
-                                        rs.getTimestamp("zeitpunkt"));
-                                }
-                            }
-                        }
-                        
-                        System.out.print("\nStatus zurücksetzen auf '" + currentStatus + "'? (j/n): ");
-                        String resetChoice = scanner.nextLine().toLowerCase();
-                        
-                        if (resetChoice.equals("j") || resetChoice.equals("ja")) {
-                            try (PreparedStatement pstmt3 = connection.prepareStatement(updateSql)) {
-                                pstmt3.setString(1, currentStatus);
-                                pstmt3.setInt(2, deviceId);
-                                pstmt3.executeUpdate();
-                                System.out.println("✓ Status zurückgesetzt auf: " + currentStatus);
-                            }
-                        }
-                        
-                    } else {
-                        System.out.println("\n✗ FEHLER: Keine neuen AuditLog-Einträge erstellt!");
-                        System.out.println("Mögliche Ursachen:");
-                        System.out.println("1. Trigger ist nicht aktiv oder fehlerhaft");
-                        System.out.println("2. AuditLog-Tabelle existiert nicht");
-                        System.out.println("3. Benutzer hat keine INSERT-Rechte auf AuditLog");
-                    }
-                }
-            }
-            
-        } catch (NumberFormatException e) {
-            System.out.println("✗ Ungültige Geräte-ID!");
-        } catch (SQLException e) {
-            System.err.println("✗ SQL Fehler: " + e.getMessage());
-            if (e.getErrorCode() == 544) {
-                System.err.println("Status muss einer der folgenden sein: LAGER, AKTIV, DEFEKT, AUSGESCHIEDEN");
-            }
-        } catch (InterruptedException e) {
-            System.err.println("✗ Sleep unterbrochen: " + e.getMessage());
-        }
-    }
-    
-    // ============================================================
-    // 14. Datenbank-Informationen
-    // ============================================================
-    private void showDatabaseInfo() {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("DATENBANK-INFORMATIONEN");
-        System.out.println("=".repeat(60));
-        
-        try {
-            var meta = connection.getMetaData();
-            
-            System.out.println("\n=== Verbindungsinformationen ===");
-            System.out.println("Datenbank: " + meta.getDatabaseProductName() 
-                             + " " + meta.getDatabaseProductVersion());
-            System.out.println("JDBC-Treiber: " + meta.getDriverName() 
-                             + " " + meta.getDriverVersion());
-            System.out.println("URL: " + meta.getURL());
-            System.out.println("Benutzer: " + meta.getUserName());
-            
-            System.out.println("\n=== Datenbank-Statistiken ===");
-            
-            showTablesInfo();
-            showViewsInfo();
-            showStoredProceduresInfo();
-            
-        } catch (SQLException e) {
-            System.err.println("✗ Fehler: " + e.getMessage());
         }
     }
     
@@ -1271,24 +1253,9 @@ public class MenuManager {
         }
     }
     
-    // ============================================================
-    // Hilfsmethoden für AuditLog
-    // ============================================================
     private boolean isValidStatus(String status) {
         return status.equals("LAGER") || status.equals("AKTIV") || 
                status.equals("DEFEKT") || status.equals("AUSGESCHIEDEN");
-    }
-    
-    private String getDeviceStatus(int deviceId) throws SQLException {
-        String sql = "SELECT status FROM Endgeraet WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, deviceId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getString("status");
-            }
-        }
-        return null;
     }
     
     private int getAuditLogCount() throws SQLException {

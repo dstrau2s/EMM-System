@@ -476,7 +476,7 @@ public class DeviceRepository {
         device.setManufacturer(rs.getString("hersteller"));
         device.setModel(rs.getString("modell"));
         device.setOs(rs.getString("betriebssystem"));
-        device.setOsVersion(rs.getString("os_version"));
+        device.setOsVersion(rs.getString("osVersion"));
         device.setImei(rs.getString("imei"));
         device.setStatus(rs.getString("status"));
         
@@ -587,5 +587,35 @@ public class DeviceRepository {
             }
         }
         return 0;
+    }
+    
+    public boolean isImeiExists(String imei) throws SQLException {
+        String sql = "SELECT COUNT(*) as count FROM Endgeraet WHERE imei = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, imei);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("count") > 0;
+                }
+            }
+        }
+        return false;
+    }
+    
+    public boolean employeeExists(int employeeId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM Mitarbeiter WHERE id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, employeeId);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
     }
 }
